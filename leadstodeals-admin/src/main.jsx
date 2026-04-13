@@ -22,3 +22,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     </BrowserRouter>
   </QueryClientProvider>
 )
+// Despliegue forzado para unificación de monorepositorio
