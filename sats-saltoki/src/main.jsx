@@ -9,3 +9,4 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <App />
   </AuthGate>
 )
+// Despliegue forzado para unificación de monorepositorio
