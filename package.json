@@ -1,0 +1,18 @@
+{
+  "name": "leadstodeals-ecosystem",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "core-saas",
+    "leadstodeals-scoring",
+    "leadstodeals-admin",
+    "intranox-ofertas",
+    "sats-saltoki"
+  ],
+  "scripts": {
+    "install-all": "npm install",
+    "build:scoring": "npm run build -w leadstodeals-scoring",
+    "build:admin": "npm run build -w leadstodeals-admin",
+    "build:ofertas": "npm run build -w intranox-ofertas"
+  }
+}

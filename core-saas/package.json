@@ -1,0 +1,11 @@
+{
+  "name": "core-saas",
+  "version": "1.0.0",
+  "description": "Cerebro compartido para el ecosistema multi-tenant",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.1",
+    "@tanstack/react-query": "^5.67.2"
+  }
+}

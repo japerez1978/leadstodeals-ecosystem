@@ -1,0 +1,123 @@
+# Reglas del proyecto — Leadstodeals / Juan Ángel
+# Última actualización: 07/04/2026
+
+## Stack tecnológico
+- React + Vite + Tailwind CSS
+- Supabase (base de datos + auth + storage)
+- React Router DOM para navegación
+- Vercel para despliegue (modo MANUAL)
+
+---
+
+## REGLA 1 — Antes de cualquier push
+Ejecuta SIEMPRE antes de hacer git push:
+```bash
+npm run build
+```
+- Exit code: 0 sin errores → puedes hacer push ✅
+- Exit code: 1 con errores → NO hacer push ❌
+- NUNCA hacer push si el build falla
+
+---
+
+## REGLA 2 — Cuando hay un bug
+NO arregles bug a bug. Protocolo completo de una sola vez:
+1. Busca en TODOS los archivos el origen del problema
+2. Escanea variables sin definir:
+   ```bash
+   grep -rn "is not defined" src/
+   ```
+3. Arregla TODOS los errores encontrados a la vez
+4. Ejecuta npm run build → confirma Exit code: 0
+5. Solo entonces haz git push
+
+---
+
+## REGLA 3 — Imports obligatorios
+Antes de usar cualquier componente, hook o función:
+- Verificar que está importado en la cabecera del archivo
+- React Router DOM — importar siempre explícitamente:
+  ```jsx
+  import { Link, useNavigate, useParams, BrowserRouter, Routes, Route } from "react-router-dom";
+  ```
+- Verificar que App está envuelto en BrowserRouter en main.jsx
+
+---
+
+## REGLA 4 — Errores de Supabase
+### Error 403 Forbidden = problema de RLS, NO de código
+Se resuelve en Supabase SQL Editor, nunca en el código.
+
+Política que funciona para apps sin autenticación:
+```sql
+drop policy if exists "Tenant isolation" on [tabla];
+drop policy if exists "Acceso total" on [tabla];
+
+create policy "Acceso total" on [tabla]
+  for all
+  to anon, authenticated
+  using (true)
+  with check (true);
+```
+
+### Error 400 Bad Request en Storage = nombre de bucket incorrecto
+Verificar nombre exacto con:
+```sql
+select id from storage.buckets;
+```
+Los nombres de bucket son CASE SENSITIVE. Usar siempre minúsculas.
+
+---
+
+## REGLA 5 — Variables de entorno
+- Nunca credenciales directamente en el código
+- Siempre: import.meta.env.VITE_NOMBRE_VARIABLE
+- El archivo .env.local nunca se sube a GitHub (.gitignore)
+
+---
+
+## REGLA 6 — Supabase convenciones
+- Nombres de tablas: minúsculas con guiones bajos (ej: sats)
+- Nombres de buckets: minúsculas con guiones (ej: sat-fotos)
+- RLS activado en todas las tablas
+- Política mínima necesaria para apps sin auth:
+  using (true) with check (true)
+
+---
+
+## REGLA 7 — Vercel está en modo MANUAL
+Después de cada push hay que redesplegar manualmente:
+Vercel → Deployments → botón "..." → Redeploy
+NO se despliega automáticamente.
+
+---
+
+## REGLA 8 — Pantalla negra en Vercel
+Protocolo completo:
+1. F12 → Console → copiar el error en rojo
+2. Buscar en TODOS los archivos .jsx y .js componentes
+   o variables que se usen sin estar importadas
+3. Arreglarlo TODO de una vez
+4. npm run build → Exit code: 0 → git push → Redeploy
+
+Motivo: en local quedan cachés que ocultan errores.
+Vercel construye desde cero — ahí aparecen todos los errores reales.
+
+---
+
+## REGLA 9 — Commits
+Formato descriptivo siempre:
+- fix(NombreArchivo): descripción del fix
+- feat(NombreArchivo): descripción de la nueva función
+- refactor(NombreArchivo): descripción del refactor
+
+---
+
+## CHECKLIST antes de entregar cualquier feature
+- [ ] npm run build → Exit code: 0
+- [ ] App funciona en localhost:5173
+- [ ] Imports verificados en todos los archivos modificados
+- [ ] Variables de entorno correctas en .env.local
+- [ ] Políticas RLS de Supabase verificadas
+- [ ] Sin console.log innecesarios en producción
+- [ ] git push → Redeploy manual en Vercel
