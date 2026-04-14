@@ -9,7 +9,7 @@ export const ProtectedRoute = () => {
 
   // Consumimos el motor SaaS
   const { data: tenantData, isLoading: tenantLoading } = useTenant(user?.id, user?.email)
-  const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.id)
+  const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.id, user?.id)
 
   const loading = authLoading || tenantLoading || accessLoading
 
@@ -38,7 +38,9 @@ export const ProtectedRoute = () => {
   }
 
   // 3. Verificación de permiso específico para esta App ('ofertas')
-  const hasAccess = userRole === 'superadmin' || userAccess.includes('ofertas')
+  const hasAccess = userRole === 'superadmin'
+    || userAccess.includes('ofertas')
+    || userAccess.includes('ofertas_hubspot')
   
   if (!hasAccess) {
     return (

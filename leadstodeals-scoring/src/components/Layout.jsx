@@ -26,7 +26,7 @@ const Layout = ({ children }) => {
 
   // Cargamos los datos del sistema SaaS
   const { data: tenantData, isLoading: tenantLoading } = useTenant(user?.id, user?.email);
-  const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.tenant_id);
+  const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.tenant_id, user?.id);
 
   const tenant = tenantData?.tenants;
   const userRole = tenantData?.rol;
@@ -39,7 +39,14 @@ const Layout = ({ children }) => {
   const isActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   // Helper para verificar permisos de apps (usando el nuevo sistema de slugs)
-  const hasApp = (slug) => userAccess.includes(slug) || userRole === 'superadmin';
+  const hasApp = (slug) => {
+    if (userRole === 'superadmin') return true;
+    const aliases = {
+      scoring: ['scoring', 'ltd_score', 'ltd-score'],
+    };
+    const candidates = aliases[slug] || [slug];
+    return candidates.some((candidate) => userAccess.includes(candidate));
+  };
 
   if (tenantLoading && !tenantData) return <Spinner />;
 

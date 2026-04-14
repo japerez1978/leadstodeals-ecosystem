@@ -10,15 +10,254 @@ const app = express();
 const stripe = new Stripe(process.env.STRIPE_SK);
 const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_KEY);
 
-const PRICE_MAP = {
-  ofertas_hubspot: process.env.STRIPE_PRICE_OFERTAS,
-  sat_gestion: process.env.STRIPE_PRICE_SAT,
+const APP_SLUG_ALIASES = {
+  ofertas: 'ofertas_hubspot',
+  ofertas_hubspot: 'ofertas_hubspot',
+  sat: 'sat_gestion',
+  sats: 'sat_gestion',
+  sat_gestion: 'sat_gestion',
+  ltd_score: 'ltd_score',
+  'ltd-score': 'ltd_score',
+  scoring: 'ltd_score',
 };
 
-const PRICE_TO_AMOUNT = {
+const PRICE_MAP = Object.freeze({
+  ofertas_hubspot: process.env.STRIPE_PRICE_OFERTAS,
+  sat_gestion: process.env.STRIPE_PRICE_SAT,
+});
+
+const PRICE_TO_AMOUNT = Object.freeze({
   [process.env.STRIPE_PRICE_OFERTAS]: 99,
   [process.env.STRIPE_PRICE_SAT]: 49,
-};
+});
+
+const PRICE_TO_APP_SLUG = Object.fromEntries(
+  Object.entries(PRICE_MAP)
+    .filter(([, priceId]) => !!priceId)
+    .map(([appSlug, priceId]) => [priceId, appSlug])
+);
+
+function normalizeAppSlug(appSlug) {
+  if (!appSlug) return null;
+  return APP_SLUG_ALIASES[appSlug] || appSlug;
+}
+
+function mapStripeStatusToEstado(stripeStatus) {
+  switch (stripeStatus) {
+    case 'active':
+    case 'trialing':
+      return 'activo';
+    case 'past_due':
+      return 'past_due';
+    case 'unpaid':
+      return 'impagado';
+    case 'incomplete':
+      return 'incompleto';
+    case 'incomplete_expired':
+    case 'canceled':
+      return 'cancelado';
+    default:
+      return stripeStatus || 'desconocido';
+  }
+}
+
+function entitlementIsActive(stripeStatus) {
+  return ['active', 'trialing', 'past_due', 'unpaid'].includes(stripeStatus);
+}
+
+function isMissingTableError(error) {
+  return error?.code === '42P01' || /relation .* does not exist/i.test(error?.message || '');
+}
+
+async function wasEventProcessed(stripeEventId) {
+  if (!stripeEventId) return false;
+
+  const { data, error } = await supabase
+    .from('billing_events')
+    .select('status')
+    .eq('stripe_event_id', stripeEventId)
+    .maybeSingle();
+
+  if (error) {
+    if (isMissingTableError(error)) return false;
+    throw error;
+  }
+  return data?.status === 'processed';
+}
+
+async function updateBillingEvent(stripeEventId, patch) {
+  if (!stripeEventId) return;
+  const { error } = await supabase
+    .from('billing_events')
+    .upsert(
+      { stripe_event_id: stripeEventId, ...patch },
+      { onConflict: 'stripe_event_id' }
+    );
+
+  if (error && !isMissingTableError(error)) {
+    throw error;
+  }
+}
+
+async function setTenantAppActivation(tenantId, appSlug, isActive) {
+  if (!tenantId || !appSlug) return;
+  const normalizedSlug = normalizeAppSlug(appSlug);
+
+  const { error: upsertError } = await supabase
+    .from('tenant_apps')
+    .upsert(
+      { tenant_id: tenantId, app_slug: normalizedSlug, activa: isActive },
+      { onConflict: 'tenant_id,app_slug' }
+    );
+
+  if (!upsertError) return;
+
+  const { data: updatedRows, error: updateError } = await supabase
+    .from('tenant_apps')
+    .update({ activa: isActive })
+    .eq('tenant_id', tenantId)
+    .eq('app_slug', normalizedSlug)
+    .select('id');
+
+  if (updateError) throw updateError;
+  if (updatedRows?.length) return;
+
+  const { error: insertError } = await supabase
+    .from('tenant_apps')
+    .insert({ tenant_id: tenantId, app_slug: normalizedSlug, activa: isActive });
+
+  if (insertError) throw insertError;
+}
+
+async function upsertSubscription({
+  tenantId,
+  appSlug,
+  stripeSubscriptionId,
+  stripePriceId,
+  stripeStatus,
+  monthlyAmount,
+  periodStart,
+  periodEnd,
+}) {
+  if (!tenantId || !appSlug || !stripeSubscriptionId) return;
+
+  const estado = mapStripeStatusToEstado(stripeStatus);
+  const normalizedSlug = normalizeAppSlug(appSlug);
+  const inicio = new Date(periodStart || Date.now()).toISOString().slice(0, 10);
+
+  const payload = {
+    app_slug: normalizedSlug,
+    estado,
+    precio_mes: monthlyAmount || 0,
+    stripe_price_id: stripePriceId || null,
+    current_period_end: periodEnd ? new Date(periodEnd).toISOString() : null,
+  };
+
+  const { data: updatedRows, error: updateError } = await supabase
+    .from('subscriptions')
+    .update(payload)
+    .eq('stripe_subscription_id', stripeSubscriptionId)
+    .select('id');
+
+  if (updateError) throw updateError;
+  if (updatedRows?.length) return;
+
+  const { error: insertError } = await supabase
+    .from('subscriptions')
+    .insert({
+      tenant_id: tenantId,
+      stripe_subscription_id: stripeSubscriptionId,
+      inicio,
+      ...payload,
+    });
+
+  if (insertError) throw insertError;
+}
+
+async function resolveTenantAndAppFromSubscription(subscription) {
+  const stripeSubscriptionId = subscription?.id;
+  const stripePriceId = subscription?.items?.data?.[0]?.price?.id;
+  const metadataTenantId = parseInt(subscription?.metadata?.tenant_id, 10);
+  const metadataAppSlug = normalizeAppSlug(subscription?.metadata?.app_slug);
+
+  if (metadataTenantId && metadataAppSlug) {
+    return { tenantId: metadataTenantId, appSlug: metadataAppSlug, stripePriceId };
+  }
+
+  if (stripeSubscriptionId) {
+    const { data: existing, error } = await supabase
+      .from('subscriptions')
+      .select('tenant_id, app_slug')
+      .eq('stripe_subscription_id', stripeSubscriptionId)
+      .maybeSingle();
+
+    if (!error && existing?.tenant_id && existing?.app_slug) {
+      return {
+        tenantId: existing.tenant_id,
+        appSlug: normalizeAppSlug(existing.app_slug),
+        stripePriceId,
+      };
+    }
+  }
+
+  return {
+    tenantId: metadataTenantId || null,
+    appSlug: metadataAppSlug || normalizeAppSlug(PRICE_TO_APP_SLUG[stripePriceId]),
+    stripePriceId,
+  };
+}
+
+async function handleCheckoutSessionCompleted(session) {
+  const tenantId = parseInt(session.metadata?.tenant_id, 10);
+  const stripeSubscriptionId = session.subscription;
+  if (!tenantId || !stripeSubscriptionId) return;
+
+  const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+  const stripePriceId = subscription.items.data[0]?.price?.id;
+  const appSlug = normalizeAppSlug(session.metadata?.app_slug) || normalizeAppSlug(PRICE_TO_APP_SLUG[stripePriceId]);
+  const monthlyAmount = PRICE_TO_AMOUNT[stripePriceId]
+    || Math.round((subscription.items.data[0]?.price?.unit_amount || 0) / 100);
+
+  await upsertSubscription({
+    tenantId,
+    appSlug,
+    stripeSubscriptionId,
+    stripePriceId,
+    stripeStatus: subscription.status,
+    monthlyAmount,
+    periodStart: subscription.current_period_start * 1000,
+    periodEnd: subscription.current_period_end * 1000,
+  });
+
+  if (session.customer) {
+    await supabase.from('tenants').update({ stripe_customer_id: session.customer }).eq('id', tenantId);
+  }
+
+  await setTenantAppActivation(tenantId, appSlug, entitlementIsActive(subscription.status));
+}
+
+async function handleSubscriptionLifecycle(subscription, forcedStatus = null) {
+  const stripeStatus = forcedStatus || subscription.status;
+  const stripeSubscriptionId = subscription.id;
+  const { tenantId, appSlug, stripePriceId } = await resolveTenantAndAppFromSubscription(subscription);
+  if (!tenantId || !appSlug || !stripeSubscriptionId) return;
+
+  const monthlyAmount = PRICE_TO_AMOUNT[stripePriceId]
+    || Math.round((subscription.items?.data?.[0]?.price?.unit_amount || 0) / 100);
+
+  await upsertSubscription({
+    tenantId,
+    appSlug,
+    stripeSubscriptionId,
+    stripePriceId,
+    stripeStatus,
+    monthlyAmount,
+    periodStart: (subscription.current_period_start || Date.now() / 1000) * 1000,
+    periodEnd: subscription.current_period_end ? subscription.current_period_end * 1000 : null,
+  });
+
+  await setTenantAppActivation(tenantId, appSlug, entitlementIsActive(stripeStatus));
+}
 
 app.use(cors());
 
@@ -35,38 +274,41 @@ app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
-    const tenantId = parseInt(session.metadata?.tenant_id);
-    const appSlug = session.metadata?.app_slug;
-    const subscriptionId = session.subscription;
-
-    if (tenantId && appSlug && subscriptionId) {
-      const sub = await stripe.subscriptions.retrieve(subscriptionId);
-      const priceId = sub.items.data[0]?.price?.id;
-
-      await supabase.from('subscriptions').insert({
-        tenant_id: tenantId,
-        app_slug: appSlug,
-        estado: 'activo',
-        precio_mes: PRICE_TO_AMOUNT[priceId] || 0,
-        inicio: new Date(sub.current_period_start * 1000).toISOString().slice(0, 10),
-        stripe_subscription_id: subscriptionId,
-        stripe_price_id: priceId,
-        current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-      });
-
-      if (session.customer) {
-        await supabase.from('tenants').update({ stripe_customer_id: session.customer }).eq('id', tenantId);
-      }
-
-      await supabase.from('tenant_apps').upsert(
-        { tenant_id: tenantId, app_slug: appSlug, activa: true },
-        { onConflict: 'tenant_id,app_slug' }
-      );
+  try {
+    if (await wasEventProcessed(event.id)) {
+      return res.json({ received: true, duplicate: true });
     }
-  } else if (event.type === 'customer.subscription.deleted') {
-    await supabase.from('subscriptions').update({ estado: 'cancelado' }).eq('stripe_subscription_id', event.data.object.id);
+
+    await updateBillingEvent(event.id, {
+      event_type: event.type,
+      status: 'received',
+      payload: event,
+      received_at: new Date().toISOString(),
+    });
+
+    if (event.type === 'checkout.session.completed') {
+      await handleCheckoutSessionCompleted(event.data.object);
+    } else if (event.type === 'customer.subscription.updated') {
+      await handleSubscriptionLifecycle(event.data.object);
+    } else if (event.type === 'customer.subscription.deleted') {
+      await handleSubscriptionLifecycle(event.data.object, 'canceled');
+    }
+
+    await updateBillingEvent(event.id, {
+      event_type: event.type,
+      status: 'processed',
+      processed_at: new Date().toISOString(),
+      error_message: null,
+    });
+  } catch (err) {
+    console.error('⚠️ Stripe Webhook processing failed:', err.message);
+    await updateBillingEvent(event.id, {
+      event_type: event.type,
+      status: 'failed',
+      processed_at: new Date().toISOString(),
+      error_message: err.message,
+    });
+    return res.status(500).json({ error: err.message });
   }
 
   res.json({ received: true });
@@ -106,7 +348,9 @@ app.post('/api/hubspot-webhook', async (req, res) => {
 app.post('/api/create-checkout', async (req, res) => {
   try {
     const { tenant_id, app_slug } = req.body;
-    const priceId = PRICE_MAP[app_slug];
+    const normalizedSlug = normalizeAppSlug(app_slug);
+    const priceId = PRICE_MAP[normalizedSlug];
+    if (!priceId) return res.status(400).json({ error: 'app_slug no configurado en Stripe' });
     const { data: tenant } = await supabase.from('tenants').select('*').eq('id', tenant_id).single();
     if (!tenant) return res.status(404).json({ error: 'Tenant no encontrado' });
 
@@ -122,8 +366,8 @@ app.post('/api/create-checkout', async (req, res) => {
       payment_method_types: ['card'],
       mode: 'subscription',
       line_items: [{ price: priceId, quantity: 1 }],
-      metadata: { tenant_id: String(tenant_id), app_slug },
-      success_url: `${req.headers.origin || 'http://localhost:5175'}/billing?success=true&tenant=${tenant_id}&app=${app_slug}`,
+      metadata: { tenant_id: String(tenant_id), app_slug: normalizedSlug },
+      success_url: `${req.headers.origin || 'http://localhost:5175'}/billing?success=true&tenant=${tenant_id}&app=${normalizedSlug}`,
       cancel_url: `${req.headers.origin || 'http://localhost:5175'}/billing?canceled=true`,
     });
     res.json({ url: session.url });
@@ -198,4 +442,3 @@ app.listen(PORT, () => {
   console.log(`   Billing: /api/create-checkout, /api/customer-portal`);
   console.log(`   Proxy: /proxy/:source/*\n`);
 });
-

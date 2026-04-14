@@ -29,6 +29,14 @@ export default function UsersPage() {
     }
   })
 
+  const { data: tenantApps = [] } = useQuery({
+    queryKey: ['saas', 'tenant_apps'],
+    queryFn: async () => {
+      const { data } = await supabase.from('tenant_apps').select('*');
+      return data || [];
+    }
+  })
+
   const { data: apps = [] } = useApps() // Usamos el hook centralizado
 
   const { data: allAccess = [] } = useQuery({
@@ -43,6 +51,12 @@ export default function UsersPage() {
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
   const tenantName = (id) => tenants.find(t => Number(t.id) === Number(id))?.nombre || '—'
   const getUserApps = (authUserUuid) => allAccess.filter(a => a.auth_user_id === authUserUuid)
+  const tenantHasApp = (tenantId, appSlug) =>
+    tenantApps.some((a) =>
+      Number(a.tenant_id) === Number(tenantId)
+      && a.app_slug === appSlug
+      && a.activa === true
+    )
 
   // ACCIONES
   async function handleCreateUser() {
@@ -81,7 +95,16 @@ export default function UsersPage() {
   async function handleDeleteUser(u) {
     if (!confirm(`¿Eliminar al usuario ${u.email}?`)) return
     try {
-      await supabase.from('user_app_access').delete().eq('tenant_user_id', u.id)
+      if (u.auth_user_id) {
+        await supabase
+          .from('user_app_access')
+          .delete()
+          .eq('auth_user_id', u.auth_user_id)
+          .eq('tenant_id', u.tenant_id)
+      } else {
+        // Fallback para posibles registros legacy.
+        await supabase.from('user_app_access').delete().eq('tenant_user_id', u.id)
+      }
       await supabase.from('tenant_users').delete().eq('id', u.id)
       showToast('✅ Usuario eliminado')
       queryClient.invalidateQueries({ queryKey: ['saas'] })
@@ -98,6 +121,12 @@ export default function UsersPage() {
     }
 
     setToggling(appSlug)
+    if (!tenantHasApp(tenantId, appSlug)) {
+      showToast('⚠️ Esta app no está contratada o activa para este tenant')
+      setToggling(null)
+      return
+    }
+
     const existing = allAccess.find(a => a.auth_user_id === authUserUuid && a.app_slug === appSlug)
 
     try {
@@ -246,6 +275,7 @@ export default function UsersPage() {
               </p>
               {apps.map(app => {
                 const hasAccess = allAccess.some(a => a.auth_user_id === accessModal.auth_user_id && a.app_slug === app.slug)
+                const contracted = tenantHasApp(accessModal.tenant_id, app.slug)
                 return (
                   <div key={app.id} style={{
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -262,10 +292,10 @@ export default function UsersPage() {
                     <button
                       className={`btn ${hasAccess ? 'btn-ghost' : 'btn-primary'} btn-sm`}
                       onClick={() => toggleAppAccess(accessModal.auth_user_id, app.slug, accessModal.tenant_id)}
-                      disabled={toggling === app.slug}
+                      disabled={toggling === app.slug || !contracted}
                       style={hasAccess ? { color: 'var(--danger)' } : {}}
                     >
-                      {toggling === app.slug ? '...' : hasAccess ? 'Quitar' : 'Asignar'}
+                      {toggling === app.slug ? '...' : !contracted ? 'No contratada' : hasAccess ? 'Quitar' : 'Asignar'}
                     </button>
                   </div>
                 )

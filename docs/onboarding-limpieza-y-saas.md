@@ -18,6 +18,7 @@ A fecha de hoy:
 - `leadstodeals-admin` ya despliega en Netlify
 - el backend/proxy real apunta a Railway
 - Vercel ya no parece necesario para runtime
+- artefactos técnicos de Vercel eliminados del repo (`vercel.json` y `.vercel`)
 
 Conclusión:
 
@@ -34,16 +35,14 @@ Eliminar Vercel como pieza activa de la arquitectura sin romper producción.
 ### Lo que ya está validado
 
 - No hay funciones serverless activas de Vercel en el repo.
-- Los `vercel.json` encontrados son solo rewrites a Railway.
+- Los antiguos `vercel.json` eran solo rewrites a Railway y ya fueron retirados.
 - `admin` y `ofertas` ya llaman a Railway directamente en código.
 - `scoring` depende de `VITE_PROXY_URL`, que ya puede apuntar a Railway.
 
 ### Restos de Vercel detectados en el repo
 
-- `intranox-ofertas/vercel.json`
-- `leadstodeals-scoring/vercel.json`
-- `leadstodeals-admin/vercel.json`
-- `leadstodeals-admin/.vercel`
+- No quedan artefactos operativos de Vercel en código fuente.
+- Solo quedan referencias históricas en documentación y reglas internas.
 
 ### Checklist antes de borrarlo
 
@@ -54,11 +53,10 @@ Eliminar Vercel como pieza activa de la arquitectura sin romper producción.
 
 ### Acción recomendada
 
-Cuando el checklist anterior esté cerrado:
+Con el repo ya limpio de artefactos Vercel:
 
-- borrar proyectos de Vercel desde el panel
-- borrar `vercel.json` del repo
-- borrar `leadstodeals-admin/.vercel`
+- borrar proyectos de Vercel desde el panel (si quedan)
+- verificar DNS final en Netlify
 - limpiar documentación antigua que hable de Vercel como pieza activa
 
 ### Criterio de éxito
