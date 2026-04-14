@@ -13,6 +13,8 @@
   "scripts": {
     "build": "echo 'Use a project-specific build script: build:sats, build:scoring, build:admin, build:ofertas, build:fee' && exit 1",
     "install-all": "npm install",
+    "dev:proxy": "npm --prefix services/intranox-proxy run dev",
+    "start:proxy": "npm --prefix services/intranox-proxy run start",
     "build:scoring": "npm run build -w leadstodeals-scoring",
     "build:admin": "npm run build -w leadstodeals-admin",
     "build:ofertas": "npm run build -w intranox-ofertas",
