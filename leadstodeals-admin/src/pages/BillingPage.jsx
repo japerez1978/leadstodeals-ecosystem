@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../supabase'
+import { supabase } from 'core-saas'
 import { CreditCard, ExternalLink, X, Wallet, CheckCircle, XCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 

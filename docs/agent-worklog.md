@@ -205,3 +205,29 @@ Estado operativo local (turno actual):
 - Frontend admin levantado en `http://localhost:5175/`.
 - Backend central levantado en `http://localhost:3001/`.
 - Health check backend: `{"ok":true,"objectId":"2-198173351","tokenConfigured":false}`.
+
+### 2026-04-14 - Bloque 6: hardening de cliente Supabase en Admin
+
+Hecho:
+
+- Detectado warning recurrente en consola:
+  - `Multiple GoTrueClient instances detected in the same browser context`.
+- Unificado `leadstodeals-admin` para usar una sola instancia de Supabase (`core-saas`).
+- Archivos ajustados:
+  - `leadstodeals-admin/src/App.jsx`
+  - `leadstodeals-admin/src/pages/DashboardPage.jsx`
+  - `leadstodeals-admin/src/pages/BillingPage.jsx`
+- Eliminado cliente duplicado:
+  - `leadstodeals-admin/src/supabase.js`
+- Revalidado build:
+  - `npm run build:admin` ✅
+
+Por que:
+
+- Evitar comportamiento indefinido en autenticación/sesión por doble cliente GoTrue.
+- Mantener contrato técnico homogéneo entre apps del ecosistema.
+
+Resultado:
+
+- `admin` ya consume una única fuente de cliente Supabase.
+- Menor riesgo de inconsistencias de sesión y eventos de auth duplicados.

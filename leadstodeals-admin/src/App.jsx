@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom'
-import { supabase } from './supabase'
+import { supabase } from 'core-saas'
 import { Building2, Users, CreditCard, LayoutDashboard, LogOut, Shield, AppWindow } from 'lucide-react'
 import DashboardPage from './pages/DashboardPage'
 import TenantsPage from './pages/TenantsPage'

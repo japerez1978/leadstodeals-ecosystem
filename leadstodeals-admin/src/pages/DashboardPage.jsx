@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../supabase'
+import { supabase } from 'core-saas'
 import { Building2, Users, CreditCard, ArrowUpRight } from 'lucide-react'
 
 export default function DashboardPage() {
