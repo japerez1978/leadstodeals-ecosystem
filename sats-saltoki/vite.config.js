@@ -11,10 +11,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      // Forzamos la resolución desde la raíz del monorepositorio
-      '@supabase/supabase-js': path.resolve(__dirname, '../node_modules/@supabase/supabase-js'),
-      'react': path.resolve(__dirname, '../node_modules/react'),
-      'react-dom': path.resolve(__dirname, '../node_modules/react-dom')
+      // Solo fijamos dependencias compartidas del monorepo.
+      // React y ReactDOM se resuelven desde este workspace para respetar su versión propia.
+      '@supabase/supabase-js': path.resolve(__dirname, '../node_modules/@supabase/supabase-js')
     }
   }
 })

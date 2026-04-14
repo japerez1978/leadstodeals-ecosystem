@@ -2,6 +2,7 @@
   "name": "sats-saltoki",
   "version": "1.0.0",
   "private": true,
+  "type": "module",
   "dependencies": {
     "@supabase/supabase-js": "^2.49.1",
     "react": "^18.2.0",
