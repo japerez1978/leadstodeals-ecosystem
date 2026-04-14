@@ -1,0 +1,9 @@
+[build]
+  command = "npm run build:admin"
+  publish = "leadstodeals-admin/dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
