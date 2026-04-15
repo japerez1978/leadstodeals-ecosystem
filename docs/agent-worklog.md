@@ -172,6 +172,42 @@ Resultado:
 - El webhook de Stripe ya puede registrar y verificar idempotencia real.
 - Los accesos de usuarios se guardan y consultan correctamente.
 
+### 2026-04-15 - Bloque 12: E2E de BD + normalización de slugs en producción
+
+Hecho:
+
+- Validación E2E completa a nivel de BD:
+  - `billing_events` ✅ — escritura e idempotencia (ON CONFLICT DO NOTHING) verificadas.
+  - `tenant_apps` upsert ✅ — unique index funciona, no duplica.
+  - `has_effective_app_access` ✅ — retorna `true` cuando tenant activo + usuario con acceso.
+  - Desactivación de tenant corta acceso ✅ — `false` inmediato al poner `activa=false`.
+- Detectado desajuste de slugs entre `apps` tabla y `tenant_apps`/`user_app_access`:
+  - Slugs del catálogo actualizados de `hs-offers`, `sat-mgmt`, `ltd-score` → canónicos (`ofertas_hubspot`, `sat_gestion`, `ltd_score`).
+  - `tenant_apps` y `user_app_access` normalizados con los mismos slugs canónicos.
+- Detectado que el billing backend (`server.js`) NO está desplegado en Railway.
+  - Railway actual = solo proxy HubSpot (`/ofertas`, `/properties`, etc.).
+  - Webhook de Stripe apunta a Railway pero no existe el endpoint `/api/stripe-webhook` ahí.
+
+Por qué:
+
+- Sin slugs canónicos consistentes, el checkout Stripe habría fallado con "app_slug no configurado".
+- La función `has_effective_app_access` ya es usable desde las apps cliente para validar acceso.
+
+Resultado:
+
+- BD completamente alineada y validada.
+- Slugs canónicos consistentes en `apps`, `tenant_apps` y `user_app_access`.
+
+## Bloqueante para E2E completo (Stripe → webhook → BD)
+
+El billing backend (`leadstodeals-admin/server.js`) necesita desplegarse en Railway como servicio separado. Hasta entonces, el flujo Stripe real no puede cerrar el ciclo. Opciones:
+
+1. **Nuevo servicio Railway** (`leadstodeals-admin`) con el `server.js` actual.
+2. Actualizar `API_BASE` en `BillingPage.jsx` a la nueva URL de Railway una vez desplegado.
+3. Actualizar el webhook en Stripe al nuevo endpoint.
+
+Pendiente de confirmación del usuario antes de crear el nuevo servicio Railway.
+
 ## Pendientes inmediatos (prioridad)
 
 1. Migrar en Railway el Root Directory al path `services/intranox-proxy`.
