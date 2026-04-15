@@ -1,4 +1,4 @@
-const API_BASE = 'https://intranox-proxy-production.up.railway.app';
+const API_BASE = 'https://honest-clarity-production-e77d.up.railway.app';
 
 export async function request(endpoint, options = {}) {
   const url = `${API_BASE}${endpoint}`;
