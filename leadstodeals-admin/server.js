@@ -262,6 +262,13 @@ async function handleSubscriptionLifecycle(subscription, forcedStatus = null) {
 app.use(cors());
 
 // ─────────────────────────────────────────────────────────────────────────────
+// 0. HEALTH CHECK
+// ─────────────────────────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, service: 'leadstodeals-admin-backend', ts: new Date().toISOString() });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 1. STRIPE WEBHOOK
 // ─────────────────────────────────────────────────────────────────────────────
 app.post('/api/stripe-webhook', express.raw({ type: 'application/json' }), async (req, res) => {

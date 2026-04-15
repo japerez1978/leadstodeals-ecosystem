@@ -3,7 +3,7 @@ import { supabase } from 'core-saas'
 import { CreditCard, ExternalLink, X, Wallet, CheckCircle, XCircle } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 
-const API_BASE = 'https://intranox-proxy-production.up.railway.app'
+const API_BASE = import.meta.env.VITE_BACKEND_URL || 'https://intranox-proxy-production.up.railway.app'
 
 // Plans are now fetched dynamically from 'apps' table
 
