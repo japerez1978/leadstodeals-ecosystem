@@ -503,9 +503,39 @@ Resultado:
 
 - Billing backend en producción. El ciclo Stripe → webhook → `billing_events` → `tenant_apps.activa=true` ya puede cerrarse en producción.
 
-Pendiente inmediato:
+Consolidación de Railway realizada:
 
-1. Test E2E real: checkout Stripe de prueba → pago → webhook procesado → `billing_events` registrado → `tenant_apps.activa=true`.
-2. Consolidar proyectos Railway: el proxy de HubSpot (`intranox-proxy-production.up.railway.app`) sigue en proyecto separado. Mover al mismo proyecto `reliable-love` como segundo servicio para tenerlo todo centralizado.
-3. Borrar proyectos Railway vacíos o duplicados (2 instancias extra de intranox-proxy identificadas).
+- Borrados 3 proyectos legacy (intranox-proxy separado, leadstodeals-admin separado, duplicados).
+- Nuevo servicio proxy creado en el mismo proyecto `reliable-love`:
+  - URL: `https://honest-clarity-production-e77d.up.railway.app`
+  - Root Directory: `services/intranox-proxy`
+  - Health: `{"ok":true,"objectId":"2-198173351","tokenConfigured":true}` ✅
+- Ofertas actualizada a nueva URL proxy.
+
+### 2026-04-16 - Bloque 13: control de vencimientos de acceso
+
+Hecho:
+
+- Creada migración `20260416_add_tenant_apps_expiry.sql`:
+  - Columna `fecha_vencimiento` en `tenant_apps` (para activaciones manuales).
+  - Columna `motivo_desactivacion` en `tenant_apps` (para registro de por qué se desactivó).
+  - Actualizada función `has_effective_app_access()` para validar que no haya expirado.
+- Con esto:
+  - Clientes vía Stripe → se controlan automáticamente vía webhooks.
+  - Clientes manuales → se cortan automáticamente cuando vence `fecha_vencimiento`.
+
+Por que:
+
+- El usuario necesita dos flujos simultáneos: algunos clientes pagan vía Stripe, otros tienen activación manual con vencimiento fijo.
+- Sin control de fecha, los clientes manuales tenían acceso indefinido.
+
+Resultado:
+
+- Sistema listo para manejar ambos flujos de forma automática.
+
+Pendiente para mañana:
+
+1. Aplicar migración `20260416_add_tenant_apps_expiry.sql` en Supabase producción.
+2. Actualizar UI del admin: cuando activas una app manualmente, permitir seleccionar fecha de vencimiento.
+3. Test E2E real: checkout Stripe de prueba → pago → webhook procesado → `billing_events` registrado → `tenant_apps.activa=true`.
 4. Configurar `VITE_BACKEND_URL` en Netlify para el deploy de `leadstodeals-admin`.
