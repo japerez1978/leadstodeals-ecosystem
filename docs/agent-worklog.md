@@ -118,6 +118,60 @@ Resultado:
   - `PORT=3001 npm run dev:proxy`
 - `GET /health` responde correctamente en local.
 
+### 2026-04-15 - Bloque 10: corrección entitlement manual + gestión de apps por tenant
+
+Hecho:
+
+- Corregido bug crítico en `BillingPage.jsx`:
+  - `handleManualSubscription` ya hace upsert en `tenant_apps` tras crear la suscripción.
+  - Antes: activar un plan manual creaba la fila en `subscriptions` pero NO activaba `tenant_apps`, bloqueando el acceso real de usuarios.
+  - Ahora: el path manual tiene el mismo efecto que el path Stripe.
+- Añadida gestión directa de apps por tenant en `TenantsPage.jsx`:
+  - Nuevo botón por fila (icono `AppWindow`) abre modal de apps del tenant.
+  - El modal lista todos los productos del catálogo con estado activo/inactivo.
+  - Toggle llama a upsert/update en `tenant_apps` directamente (operación de soporte sin pasar por Stripe).
+  - Útil para activaciones manuales, pruebas, y correcciones de emergencia.
+- Build verificado: ✅
+
+Por qué:
+
+- El bug de entitlement manual bloqueaba el acceso aunque el admin viera la suscripción como activa.
+- Faltaba un punto de control operativo para gestionar apps por tenant sin tocar Stripe ni la BD directamente.
+
+Resultado:
+
+- Flujo manual y flujo Stripe ahora tienen el mismo contrato de activación.
+- Operaciones de soporte de primer nivel posibles desde la UI sin acceso a Supabase Studio.
+
+### 2026-04-15 - Bloque 11: migración baseline aplicada en Supabase + fix de esquema
+
+Hecho:
+
+- Aplicada migración `billing_entitlements_baseline` en proyecto `leadstodeals-multitenant` (eu-central-1).
+- Detectado desajuste de esquema: `user_app_access` tenía `tenant_user_id` (uuid interno) pero el frontend y la función esperaban `auth_user_id` (uuid de Supabase Auth).
+- Resuelto en la misma migración:
+  - Añadida columna `auth_user_id uuid` a `user_app_access`.
+  - Backfill automático desde `tenant_users` para registros existentes.
+  - Índice sobre `auth_user_id` para queries eficientes.
+- Creadas en producción:
+  - Tabla `billing_events` con índices por `status` y `received_at`.
+  - Columnas `stripe_subscription_id`, `stripe_price_id`, `current_period_end` en `subscriptions`.
+  - Unique index `subscriptions_stripe_subscription_id_uq`.
+  - Unique index `tenant_apps_tenant_id_app_slug_uq` (necesario para upserts idempotentes).
+  - Función `has_effective_app_access(auth_user_id, tenant_id, app_slug)`.
+
+Por qué:
+
+- Sin `billing_events` los webhooks de Stripe no tenían idempotencia real.
+- Sin el fix de `auth_user_id` el toggle de acceso en `UsersPage` insertaba en columna inexistente.
+- Sin el unique index en `tenant_apps` el upsert del webhook podía fallar en carrera.
+
+Resultado:
+
+- Contrato técnico de billing/entitlements cerrado al 100% en producción.
+- El webhook de Stripe ya puede registrar y verificar idempotencia real.
+- Los accesos de usuarios se guardan y consultan correctamente.
+
 ## Pendientes inmediatos (prioridad)
 
 1. Migrar en Railway el Root Directory al path `services/intranox-proxy`.
@@ -231,3 +285,109 @@ Resultado:
 
 - `admin` ya consume una única fuente de cliente Supabase.
 - Menor riesgo de inconsistencias de sesión y eventos de auth duplicados.
+
+### 2026-04-15 - Bloque 7: arranque SAT portable local-first
+
+Hecho:
+
+- Se crea proyecto nuevo `sats-saltoki-portable` como variante paralela de la SAT cloud.
+- Se documenta arquitectura en `docs/sat-portable-architecture.md`.
+- Se decide mantenerlo fuera del monorepo activo como workspace por ahora:
+  - convive en el repo
+  - no participa aun en `package.json` raiz
+- Se levanta shell portable con `Electron + React + Vite`.
+- Se activa importacion de Excel reutilizando la logica base de la SAT online.
+- Se activa persistencia local inmediata en navegador con `localStorage` para sobrevivir a apagados del equipo mientras se prepara el salto a SQLite.
+- Se valida build web de `sats-saltoki-portable` correctamente.
+
+Por que:
+
+- El usuario necesita una alternativa sin internet y sin tocar la SAT en produccion.
+- Separarlo reduce riesgo y permite iterar rapido sobre restricciones reales del equipo corporativo.
+
+Resultado:
+
+- Ya existe una version portable inicial accesible en local.
+- Ya se pueden cargar Exceles y dejar datos persistidos en el equipo.
+- Siguiente paso tecnico: reemplazar persistencia temporal del navegador por `SQLite` + fotos locales a traves de Electron.
+
+Actualizacion del bloque:
+
+- Se anade CRUD real local sobre la SAT portable.
+- Ya se puede:
+  - importar Excel
+  - crear SAT nuevo
+  - editar SAT existente
+  - eliminar SAT
+  - exportar otra vez a Excel
+- La persistencia sigue siendo local en navegador como paso intermedio controlado.
+- Build verificado de `sats-saltoki-portable` despues del CRUD: OK.
+
+### 2026-04-15 - Bloque 8: migrador base Supabase -> SAT portable
+
+Hecho:
+
+- Se crea script `sats-saltoki-portable/scripts/import-from-supabase.mjs`.
+- El script:
+  - lee registros `sats` desde Supabase
+  - descarga fotos desde las URLs guardadas en `fotos`
+  - guarda las imagenes en `sats-saltoki-portable/data/photos/<sat-id>/`
+  - genera `sats-saltoki-portable/data/portable-import.json`
+- Se anade script npm:
+  - `npm run import:supabase`
+
+Por que:
+
+- El usuario quiere conservar el historico visual y no rehacer manualmente la carga de fotos.
+- La relacion SAT -> fotos ya existe en Supabase y es mejor aprovecharla automaticamente.
+
+Resultado:
+
+- Ya existe una base de migracion automatizable desde la SAT cloud hacia la SAT portable.
+- Falta el ultimo paso de integrar ese JSON exportado directamente en la UI del portable.
+
+### 2026-04-15 - Bloque 8: robustez de persistencia y UX portable
+
+Hecho:
+
+- La SAT portable ya no pisa trabajo local al arrancar: solo carga el historico automatico si no existen datos locales guardados.
+- Se mejora la paginacion para trabajar por bloques mas limpios y escalables.
+- Se corrige la presentacion de fotos migradas: en navegador local las fotos importadas desde rutas `file://` muestran placeholder limpio hasta usar Electron.
+- Se pulen detalles visuales del panel operativo y de los contadores.
+
+Por que:
+
+- El comportamiento anterior podia sobrescribir cambios locales al reabrir la app.
+- La paginacion inicial no era comoda ni estetica cuando habia muchas paginas.
+- Las fotos migradas desde Supabase deben integrarse sin dar sensacion de error visual en modo navegador.
+
+Resultado:
+
+- La portable ya se comporta como base real de trabajo local, con menor riesgo de perdida de cambios y mejor lectura operativa.
+
+### 2026-04-15 - Bloque 9: fotos portables + carpeta de entrega Windows
+
+Hecho:
+
+- Se normalizan las fotos historicas a rutas portables `photos/...` en vez de `file://` absolutas.
+- La UI ya resuelve esas fotos en modo Electron sin quedar atada al Mac origen.
+- Se anaden scripts de soporte:
+  - `npm run normalize:import`
+  - `npm run prepare:handoff`
+- Se genera carpeta de entrega en `sats-saltoki-portable/handoff/SAT-Saltoki-Portable`.
+- Se crea manual corto de instalacion y uso:
+  - `sats-saltoki-portable/MANUAL-INSTALACION-Y-USO.md`
+- Se intentó generar `.exe` Windows portable desde este Mac, pero fallo por incompatibilidad de `wine64` en Apple Silicon.
+- Se deja configurado `electron-builder` para futuro target Windows `x64 portable`.
+
+Por que:
+
+- Las rutas absolutas rompian el traslado del proyecto a otro equipo.
+- Hacia falta una entrega clara para mover la app a un PC Windows con el menor riesgo posible.
+- El objetivo es dejar preparado el ultimo salto a ejecutable cuando se disponga de un Windows autorizado.
+
+Resultado:
+
+- Fotos y datos ya viajan en formato portable.
+- Existe una carpeta de handoff lista para copiar al nuevo PC.
+- El ultimo bloqueo real para el `.exe` es el empaquetado final desde entorno Windows, no la logica de la app.

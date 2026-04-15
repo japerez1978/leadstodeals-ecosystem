@@ -87,8 +87,20 @@ export default function BillingPage() {
       precio_mes: plan.price,
       inicio: new Date().toISOString().slice(0, 10),
     })
-    if (error) showToast('❌ Error: ' + error.message)
-    else showToast(`✅ Suscripción manual creada para ${tenant.nombre}`)
+    if (error) {
+      showToast('❌ Error: ' + error.message)
+      setCreating(false)
+      return
+    }
+    // Activate entitlement so users can actually access the app
+    const { error: taError } = await supabase
+      .from('tenant_apps')
+      .upsert(
+        { tenant_id: tenant.id, app_slug: plan.slug, activa: true },
+        { onConflict: 'tenant_id,app_slug' }
+      )
+    if (taError) showToast(`⚠️ Suscripción creada pero entitlement falló: ${taError.message}`)
+    else showToast(`✅ Suscripción y acceso activados para ${tenant.nombre}`)
     setCreating(false)
     setCheckoutModal(null)
     loadData()

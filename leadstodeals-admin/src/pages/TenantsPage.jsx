@@ -1,29 +1,56 @@
 import { useState, useEffect } from 'react'
 import { supabase } from 'core-saas'
-import { Plus, Edit2, Trash2, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, AppWindow } from 'lucide-react'
 
 export default function TenantsPage() {
   const [tenants, setTenants] = useState([])
-  const [apps, setApps] = useState([])
+  const [tenantApps, setTenantApps] = useState([])
+  const [catalog, setCatalog] = useState([])
   const [loading, setLoading] = useState(true)
   const [modal, setModal] = useState(null) // null | 'new' | tenant object
+  const [appsModal, setAppsModal] = useState(null) // tenant object
   const [form, setForm] = useState({ nombre: '', subdominio: '' })
   const [saving, setSaving] = useState(false)
+  const [toggling, setToggling] = useState(null)
   const [toast, setToast] = useState('')
 
   useEffect(() => { loadData() }, [])
 
   async function loadData() {
-    const [tRes, aRes] = await Promise.all([
+    const [tRes, taRes, cRes] = await Promise.all([
       supabase.from('tenants').select('*').order('id'),
       supabase.from('tenant_apps').select('*'),
+      supabase.from('apps').select('*').order('name'),
     ])
     setTenants(tRes.data || [])
-    setApps(aRes.data || [])
+    setTenantApps(taRes.data || [])
+    setCatalog(cRes.data || [])
     setLoading(false)
   }
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(''), 3000) }
+
+  const getApps = (tenantId) => tenantApps.filter(a => a.tenant_id === tenantId)
+
+  async function toggleTenantApp(tenant, appSlug) {
+    setToggling(appSlug)
+    const existing = tenantApps.find(a => a.tenant_id === tenant.id && a.app_slug === appSlug)
+    try {
+      if (existing) {
+        await supabase.from('tenant_apps').update({ activa: !existing.activa }).eq('id', existing.id)
+      } else {
+        await supabase.from('tenant_apps').insert({ tenant_id: tenant.id, app_slug: appSlug, activa: true })
+      }
+      // Refresh only tenant_apps to keep modal open
+      const { data } = await supabase.from('tenant_apps').select('*')
+      setTenantApps(data || [])
+      showToast('✅ Acceso actualizado')
+    } catch (err) {
+      showToast('❌ Error: ' + err.message)
+    } finally {
+      setToggling(null)
+    }
+  }
 
   function openNew() {
     setForm({ nombre: '', subdominio: '' })
@@ -59,8 +86,6 @@ export default function TenantsPage() {
     else { showToast('✅ Empresa eliminada'); loadData() }
   }
 
-  const getApps = (tenantId) => apps.filter(a => a.tenant_id === tenantId)
-
   if (loading) return <div className="empty-state"><div className="empty-state-icon">⏳</div><p>Cargando...</p></div>
 
   return (
@@ -94,18 +119,21 @@ export default function TenantsPage() {
                 <td style={{ fontWeight: 600 }}>{t.nombre}</td>
                 <td><span className="badge badge-accent">{t.subdominio}</span></td>
                 <td>
-                  {getApps(t.id).length === 0
-                    ? <span style={{ color: 'var(--text-muted)' }}>—</span>
-                    : getApps(t.id).map(a => (
-                      <span key={a.app_slug} className={`badge ${a.activa ? 'badge-success' : 'badge-warning'}`} style={{ marginRight: 4 }}>
-                        {a.app_slug === 'ofertas_hubspot' ? '📊 Ofertas' : a.app_slug === 'sat_gestion' ? '🔧 SAT' : a.app_slug}
-                      </span>
-                    ))
-                  }
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                    {getApps(t.id).length === 0
+                      ? <span style={{ color: 'var(--text-muted)' }}>—</span>
+                      : getApps(t.id).map(a => (
+                        <span key={a.app_slug} className={`badge ${a.activa ? 'badge-success' : 'badge-warning'}`}>
+                          {a.app_slug === 'ofertas_hubspot' ? '📊 Ofertas' : a.app_slug === 'sat_gestion' ? '🔧 SAT' : a.app_slug === 'ltd_score' ? '📈 Score' : a.app_slug}
+                        </span>
+                      ))
+                    }
+                  </div>
                 </td>
                 <td>{t.stripe_customer_id ? <span className="badge badge-success">✓</span> : <span className="badge badge-warning">—</span>}</td>
                 <td>
                   <div style={{ display: 'flex', gap: 4 }}>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setAppsModal(t)} title="Gestionar apps"><AppWindow size={14} /></button>
                     <button className="btn btn-ghost btn-sm" onClick={() => openEdit(t)} title="Editar"><Edit2 size={14} /></button>
                     <button className="btn btn-ghost btn-sm" onClick={() => handleDelete(t.id)} title="Eliminar" style={{ color: 'var(--danger)' }}><Trash2 size={14} /></button>
                   </div>
@@ -136,6 +164,54 @@ export default function TenantsPage() {
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
               <button className="btn btn-primary" onClick={handleSave} disabled={saving}>{saving ? 'Guardando...' : 'Guardar'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Apps per Tenant Modal */}
+      {appsModal && (
+        <div className="modal-overlay" onClick={() => setAppsModal(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>📦 Apps — {appsModal.nombre}</h3>
+              <button className="btn btn-ghost btn-sm" onClick={() => setAppsModal(null)}><X size={16} /></button>
+            </div>
+            <div className="modal-body">
+              <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Activa o desactiva el acceso de esta empresa a cada producto. Independiente de Stripe.
+              </p>
+              {catalog.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>No hay productos en el catálogo.</p>
+              ) : catalog.map(app => {
+                const entry = tenantApps.find(a => a.tenant_id === appsModal.id && a.app_slug === app.slug)
+                const isActive = entry?.activa === true
+                return (
+                  <div key={app.id} style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                    padding: '12px 16px',
+                    background: isActive ? 'rgba(34,197,94,0.05)' : 'var(--bg-primary)',
+                    borderRadius: 'var(--radius-sm)', marginBottom: 8,
+                    border: `1px solid ${isActive ? 'rgba(34,197,94,0.2)' : 'var(--border)'}`
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <span className="material-symbols-outlined" style={{ opacity: 0.6 }}>{app.icon}</span>
+                      <div>
+                        <div style={{ fontWeight: 600, fontSize: 14 }}>{app.name}</div>
+                        <code style={{ fontSize: 11, color: 'var(--text-muted)' }}>{app.slug}</code>
+                      </div>
+                    </div>
+                    <button
+                      className={`btn ${isActive ? 'btn-ghost' : 'btn-primary'} btn-sm`}
+                      style={isActive ? { color: 'var(--danger)' } : {}}
+                      disabled={toggling === app.slug}
+                      onClick={() => toggleTenantApp(appsModal, app.slug)}
+                    >
+                      {toggling === app.slug ? '...' : isActive ? 'Desactivar' : 'Activar'}
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
