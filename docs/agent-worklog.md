@@ -427,3 +427,85 @@ Resultado:
 - Fotos y datos ya viajan en formato portable.
 - Existe una carpeta de handoff lista para copiar al nuevo PC.
 - El ultimo bloqueo real para el `.exe` es el empaquetado final desde entorno Windows, no la logica de la app.
+
+### 2026-04-16 - Bloque 10: correcciones admin billing + modal apps por tenant
+
+Hecho:
+
+- Bug corregido en `BillingPage.jsx`: activación manual de suscripción ya no crea solo la fila en `subscriptions` — ahora también hace upsert en `tenant_apps` con `activa: true`, igual que el webhook de Stripe.
+- Nueva funcionalidad en `TenantsPage.jsx`: botón de icono en cada fila de empresa que abre modal con todos los productos del catálogo. Permite activar/desactivar cada app directamente en `tenant_apps` sin pasar por Stripe (útil para soporte, pruebas, migraciones).
+
+Por que:
+
+- El path manual de activación dejaba la empresa sin acceso real aunque tuviera suscripción activa.
+- El admin necesitaba una forma directa de gestionar entitlements por empresa.
+
+Resultado:
+
+- Activación manual funciona de extremo a extremo.
+- Admin puede gestionar apps por empresa desde la UI sin tocar la BD.
+
+### 2026-04-16 - Bloque 11: migración baseline Supabase + fix esquema + E2E BD
+
+Hecho:
+
+- Aplicada migración `20260414_billing_entitlements_baseline.sql` en producción (proyecto `leadstodeals-multitenant`, región `eu-central-1`).
+  - Tabla `billing_events` creada (idempotencia de webhooks Stripe).
+  - Función `has_effective_app_access()` creada.
+  - Unique indexes en `tenant_apps` y `subscriptions`.
+  - Columnas `stripe_subscription_id`, `stripe_price_id`, `current_period_end` añadidas a `subscriptions`.
+- Fix de esquema detectado y aplicado: `user_app_access` tenía `tenant_user_id` pero el frontend usaba `auth_user_id`. Se añadió columna y se hizo backfill automático desde `tenant_users`.
+- Slugs del catálogo (`apps` table) normalizados a slugs canónicos: `ofertas_hubspot`, `sat_gestion`, `ltd_score`.
+- Validación E2E completa en BD:
+  - `billing_events`: escritura + idempotencia ✅
+  - `tenant_apps`: upsert sin duplicados ✅
+  - `has_effective_app_access`: retorna `true` con acceso ✅
+  - Desactivar tenant corta acceso instantáneamente (`false`) ✅
+
+Por que:
+
+- Sin la migración los webhooks no tenían idempotencia real.
+- El desajuste `tenant_user_id`/`auth_user_id` habría roto el check de acceso en apps cliente.
+- Los slugs inconsistentes habrían causado `app_slug no configurado` en el servidor.
+
+Resultado:
+
+- Capa de BD de billing 100% operativa en producción.
+
+### 2026-04-16 - Bloque 12: deploy billing backend en Railway
+
+Hecho:
+
+- Preparado `leadstodeals-admin` para Railway:
+  - `package.json`: scripts `start` y `build:server` añadidos.
+  - `railway.toml`: creado con `startCommand = "node server.js"` y healthcheck en `/health`.
+  - `.env.example` del servidor creado.
+  - `API_BASE` en `BillingPage.jsx` ahora configurable vía `VITE_BACKEND_URL`.
+  - `server.js`: endpoint `/health` añadido, `PORT` respeta variable de entorno Railway.
+- Resueltos problemas de deploy:
+  - `core-saas` movido a `devDependencies` (no es necesario en servidor).
+  - `react` fijado en `19.2.4` para alinear `package.json` y `package-lock.json` (npm ci).
+  - `railway.toml` sin `builder` explícito para que Railway auto-detecte.
+- Servicio desplegado y activo en: `https://leadstodeals-ecosystem-production.up.railway.app`
+  - Health check: `{"status":"ok"}` ✅
+- Webhook de Stripe actualizado a la nueva URL Railway:
+  - `https://leadstodeals-ecosystem-production.up.railway.app/api/stripe-webhook`
+- Variables de entorno configuradas en Railway:
+  - `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `STRIPE_SK`, `STRIPE_PRICE_OFERTAS`, `STRIPE_PRICE_SAT`, `STRIPE_WEBHOOK_SECRET`
+- `BillingPage.jsx` actualizado con la URL de producción Railway.
+
+Por que:
+
+- El único bloqueante para E2E Stripe completo era que el servidor solo corría en local.
+- Sin el webhook en producción los pagos no activaban apps automáticamente.
+
+Resultado:
+
+- Billing backend en producción. El ciclo Stripe → webhook → `billing_events` → `tenant_apps.activa=true` ya puede cerrarse en producción.
+
+Pendiente inmediato:
+
+1. Test E2E real: checkout Stripe de prueba → pago → webhook procesado → `billing_events` registrado → `tenant_apps.activa=true`.
+2. Consolidar proyectos Railway: el proxy de HubSpot (`intranox-proxy-production.up.railway.app`) sigue en proyecto separado. Mover al mismo proyecto `reliable-love` como segundo servicio para tenerlo todo centralizado.
+3. Borrar proyectos Railway vacíos o duplicados (2 instancias extra de intranox-proxy identificadas).
+4. Configurar `VITE_BACKEND_URL` en Netlify para el deploy de `leadstodeals-admin`.
