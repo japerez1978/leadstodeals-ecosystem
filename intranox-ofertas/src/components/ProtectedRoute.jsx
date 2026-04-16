@@ -9,7 +9,7 @@ export const ProtectedRoute = () => {
 
   // Consumimos el motor SaaS
   const { data: tenantData, isLoading: tenantLoading } = useTenant(user?.id, user?.email)
-  const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.id, user?.id)
+  const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.tenant_id, user?.id)
 
   const loading = authLoading || tenantLoading || accessLoading
 

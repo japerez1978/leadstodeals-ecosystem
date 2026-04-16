@@ -69,15 +69,14 @@ export async function getAllOfertas({ onProgress } = {}) {
   let after = null
 
   // 1. Paginate sequentially using /ofertas/search endpoint
-  //    This endpoint correctly returns custom properties
-  //    Reportamos datos parciales (sin enriquecer) tras cada página
+  //    NOTE: HubSpot search API does NOT return associations for custom objects —
+  //    we fetch them separately via batch associations v4 below.
   for (let page = 0; page < 25; page++) {
     const data = await request('/ofertas/search', {
       method: 'POST',
       body: JSON.stringify({
         limit: 100,
         properties: OFERTA_PROPERTIES.split(','),
-        associations: ['deals', 'companies'],
         ...(after ? { after } : {}),
       })
     });
@@ -86,26 +85,39 @@ export async function getAllOfertas({ onProgress } = {}) {
     // Emitir resultados parciales (sin enriquecer) → la UI los muestra ya
     onProgress?.({ partial: [...allResults], loaded: allResults.length, phase: 'loading' });
 
-    // Cursor token from HubSpot (NOT a number - must use exactly as returned)
     if (data.paging?.next?.after) {
       after = data.paging.next.after;
     } else {
-      break;  // no more pages
+      break;
     }
   }
 
-  // 2. Collect unique IDs
+  // 2. Fetch associations via v4 batch endpoint (search doesn't return them for custom objects)
+  onProgress?.({ partial: [...allResults], loaded: allResults.length, phase: 'enriching' });
+
+  const ofertaIds = allResults.map(o => o.id);
+  const [dealAssocMap, companyAssocMap] = await Promise.all([
+    batchAssociations('2-198173351', 'deals', ofertaIds),
+    batchAssociations('2-198173351', 'companies', ofertaIds),
+  ]);
+
+  // Attach associations to each oferta result
+  allResults.forEach(o => {
+    o._dealIds = dealAssocMap[o.id] || [];
+    o._companyIds = companyAssocMap[o.id] || [];
+  });
+
+  // 3. Collect unique IDs
   const dealIds = new Set();
   const companyIds = new Set();
   allResults.forEach(o => {
-    (o.associations?.deals?.results || []).forEach(a => dealIds.add(String(a.id)));
-    (o.associations?.companies?.results || []).forEach(a => companyIds.add(String(a.id)));
+    o._dealIds.forEach(id => dealIds.add(id));
+    o._companyIds.forEach(id => companyIds.add(id));
   });
 
-  // Señal: fase de enriquecimiento iniciada
-  onProgress?.({ partial: [...allResults], loaded: allResults.length, phase: 'enriching' });
+  // Señal: fase de enriquecimiento (batch reads)
 
-  // 3. Batch-read deals (with scoring props) + companies IN PARALLEL
+  // 4. Batch-read deals (with scoring props) + companies IN PARALLEL
   const DEAL_SCORING_PROPS = [
     'dealname',
     'unidad_de_negocio_deal',
@@ -129,25 +141,52 @@ export async function getAllOfertas({ onProgress } = {}) {
     batchReadMap('companies', [...companyIds], 'name'),
   ]);
 
-  // 4. Enrich in place
+  // 5. Enrich in place
   allResults.forEach(o => {
-    const firstDealId = (o.associations?.deals?.results || [])[0]?.id;
-    const firstCompId = (o.associations?.companies?.results || [])[0]?.id;
+    const firstDealId = o._dealIds[0] || null;
+    const firstCompId = o._companyIds[0] || null;
     const dealProps = firstDealId ? (dealMap[firstDealId] || {}) : {};
     o._enriched = {
-      dealId: firstDealId || null,
+      dealId: firstDealId,
       dealName: dealProps.dealname || '',
-      dealProps,                              // ← all deal props for scoring
+      dealProps,
       companyName: firstCompId
         ? (companyMap[firstCompId] || '')
         : (o.properties?.empresa_vinculada_a_oferta || ''),
     };
   });
 
-  // 5. Emitir datos completamente enriquecidos
+  // 6. Emitir datos completamente enriquecidos
   onProgress?.({ partial: allResults, loaded: allResults.length, phase: 'done' });
 
   return { results: allResults };
+}
+
+/**
+ * Fetches associations for multiple source objects via the v4 batch associations endpoint.
+ * Returns a map: { [fromId]: [toId, ...] }
+ */
+async function batchAssociations(fromObjectType, toObjectType, ids) {
+  if (ids.length === 0) return {};
+  const chunks = chunkArray(ids, 100);
+  const responses = await Promise.all(
+    chunks.map(chunk =>
+      request(`/proxy/crm/v4/associations/${fromObjectType}/${toObjectType}/batch/read`, {
+        method: 'POST',
+        body: JSON.stringify({ inputs: chunk.map(id => ({ id })) })
+      }).catch(err => {
+        console.warn(`[batchAssociations] Error ${fromObjectType}→${toObjectType}:`, err.message);
+        return { results: [] };
+      })
+    )
+  );
+  const map = {};
+  responses.forEach(res => {
+    (res.results || []).forEach(item => {
+      map[item.from.id] = (item.to || []).map(t => String(t.toObjectId));
+    });
+  });
+  return map;
 }
 
 async function batchReadProps(objectType, ids, properties) {
