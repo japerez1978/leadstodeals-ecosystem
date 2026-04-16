@@ -62,19 +62,20 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 2. Crear fila en tenant_users (ya con auth_user_id, no hace falta auto-vinculación)
-    const { error: tuErr } = await supabaseAdmin.from('tenant_users').insert({
+    // 2. Crear fila en tenant_users
+    const { data: tuData, error: tuErr } = await supabaseAdmin.from('tenant_users').insert({
       auth_user_id,
       tenant_id: Number(tenant_id),
       email,
       rol: rol || 'user',
-    })
+    }).select('id').single()
     if (tuErr) throw tuErr
 
-    // 3. Crear accesos a apps si se especificaron
+    // 3. Crear accesos a apps con ambos campos (auth_user_id Y tenant_user_id)
     if (app_slugs.length > 0) {
       const accessRows = app_slugs.map((slug: string) => ({
         auth_user_id,
+        tenant_user_id: tuData.id,
         tenant_id: Number(tenant_id),
         app_slug: slug,
       }))
