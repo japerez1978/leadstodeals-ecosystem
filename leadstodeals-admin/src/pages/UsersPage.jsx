@@ -190,9 +190,15 @@ export default function UsersPage() {
                     {getUserApps(u.auth_user_id).length === 0 ? (
                       <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>Sin acceso</span>
                     ) : (
-                      getUserApps(u.auth_user_id).map(a => (
-                        <span key={a.app_slug} className="badge badge-success">{a.app_slug}</span>
-                      ))
+                      getUserApps(u.auth_user_id).map(a => {
+                        const appInfo = apps.find(app => app.slug === a.app_slug)
+                        return (
+                          <span key={a.app_slug} className="badge badge-success" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {appInfo?.icon && <span className="material-symbols-outlined" style={{ fontSize: 13 }}>{appInfo.icon}</span>}
+                            {appInfo?.name || a.app_slug}
+                          </span>
+                        )
+                      })
                     )}
                   </div>
                 </td>
