@@ -533,9 +533,42 @@ Resultado:
 
 - Sistema listo para manejar ambos flujos de forma automática.
 
-Pendiente para mañana:
+### 2026-04-16 - Bloque 14: reparación de loading de ofertas con propiedades custom
 
-1. Aplicar migración `20260416_add_tenant_apps_expiry.sql` en Supabase producción.
-2. Actualizar UI del admin: cuando activas una app manualmente, permitir seleccionar fecha de vencimiento.
-3. Test E2E real: checkout Stripe de prueba → pago → webhook procesado → `billing_events` registrado → `tenant_apps.activa=true`.
-4. Configurar `VITE_BACKEND_URL` en Netlify para el deploy de `leadstodeals-admin`.
+Hecho:
+
+- **Diagnosticado el problema "250 ofertas vacías"**:
+  - Raíz: `getAllOfertas()` usaba endpoint `/proxy/crm/v3/objects/2-198173351?...` que NO devuelve propiedades custom de HubSpot.
+  - Síntoma: frontend cargaba primeras 250 ofertas (≈2.5 páginas de 100) sin contenido (empresa, valor, número).
+  - Raíz profunda: HubSpot LIST endpoint no retorna custom properties aunque el token tenga permisos; SEARCH endpoint sí.
+
+- **Actualizado `intranox-ofertas/src/services/hubspot.js`**:
+  - `getAllOfertas()`: cambiado de GET `/proxy/crm/v3/objects/2-198173351?limit=100&properties=...` a POST `/ofertas/search` con body JSON.
+  - `_fetchDealIdsWithOfertas()` (dentro `getDealsWithoutOfertas()`): cambiado al mismo patrón para consistencia.
+  - El endpoint `/ofertas/search` en proxy ya existe y mapea correctamente a `crm/v3/objects/{objectType}/search`.
+  - Propiedades ahora se pasan como array en JSON (`properties: OFERTA_PROPERTIES.split(',')`).
+  - Paginación via cursor `after` sigue funcionando idénticamente.
+
+- **Por qué funciona ahora**:
+  - `/ofertas/search` usa POST a `crm/v3/objects/2-198173351/search`, que sí retorna custom properties.
+  - Ya testado: `/ofertas/search` con curl devuelve `empresa_vinculada_a_oferta`, `n__de_oferta`, `valor_oferta`.
+  - Frontend enriquecimiento (deals, companies) sigue igual; solo cambio es el fetch inicial de ofertas.
+
+Por que:
+
+- El endpoint LIST (`/crm/v3/objects/{id}`) es para asociaciones y datos básicos, no custom properties en volumen.
+- El endpoint SEARCH (`/crm/v3/objects/{id}/search`) es el correcto para custom properties, filtros y paginación eficiente.
+- La migration a `/ofertas/search` consolida tambien el código: todas las búsquedas de ofertas ahora usan POST.
+
+Resultado:
+
+- `getAllOfertas()` ahora retorna todas las ofertas con propiedades completas.
+- UI de Ofertas debería cargar correctamente toda la data al reiniciar la app.
+- Próximo paso: test en navegador para confirmar que se cargan > 250 ofertas con contenido visible.
+
+Pendiente para próxima sesión:
+
+1. Test en navegador: abrir Ofertas app, validar que no solo se cargan 250 sino todas las ~2000+ con propiedades visibles.
+2. Validar performance: `/ofertas/search` con limit 100 debería ser similar o más rápido que la paginación anterior.
+3. Resolver cualquier issue si el precio/valor no se muestra en tabla (esperado: sí debería porque ahora cargamos `valor_oferta`).
+4. Si todo OK: commit y push de estos cambios a monorepo.

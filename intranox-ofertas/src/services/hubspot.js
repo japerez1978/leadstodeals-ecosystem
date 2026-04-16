@@ -68,13 +68,19 @@ export async function getAllOfertas({ onProgress } = {}) {
   let allResults = []
   let after = null
 
-  // 1. Paginate sequentially (HubSpot uses cursor tokens, not offsets)
+  // 1. Paginate sequentially using /ofertas/search endpoint
+  //    This endpoint correctly returns custom properties
   //    Reportamos datos parciales (sin enriquecer) tras cada página
   for (let page = 0; page < 25; page++) {
-    const afterParam = after ? `&after=${after}` : '';
-    const data = await request(
-      `/proxy/crm/v3/objects/2-198173351?limit=100&properties=${OFERTA_PROPERTIES}&associations=deals,companies${afterParam}`
-    );
+    const data = await request('/ofertas/search', {
+      method: 'POST',
+      body: JSON.stringify({
+        limit: 100,
+        properties: OFERTA_PROPERTIES.split(','),
+        associations: ['deals', 'companies'],
+        ...(after ? { after } : {}),
+      })
+    });
     allResults = [...allResults, ...(data.results || [])];
 
     // Emitir resultados parciales (sin enriquecer) → la UI los muestra ya
@@ -285,10 +291,15 @@ export async function getDealsWithoutOfertas({ onProgress } = {}) {
     const ids = new Set();
     let after = null;
     for (let page = 0; page < 30; page++) {
-      const afterParam = after ? `&after=${after}` : '';
-      const data = await request(
-        `/proxy/crm/v3/objects/2-198173351?limit=100&properties=n__de_oferta&associations=deals${afterParam}`
-      ).catch(() => ({ results: [] }));
+      const data = await request('/ofertas/search', {
+        method: 'POST',
+        body: JSON.stringify({
+          limit: 100,
+          properties: ['n__de_oferta'],
+          associations: ['deals'],
+          ...(after ? { after } : {}),
+        })
+      }).catch(() => ({ results: [] }));
       (data.results || []).forEach(o =>
         (o.associations?.deals?.results || []).forEach(a => ids.add(String(a.id)))
       );
