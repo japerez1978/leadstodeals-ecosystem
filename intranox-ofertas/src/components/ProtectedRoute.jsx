@@ -11,7 +11,9 @@ export const ProtectedRoute = () => {
   const { data: tenantData, isLoading: tenantLoading } = useTenant(user?.id, user?.email)
   const { data: userAccess = [], isLoading: accessLoading } = useUserAccess(tenantData?.tenant_id, user?.id)
 
-  const loading = authLoading || tenantLoading || accessLoading
+  // accessLoading es false cuando tenantId es undefined (query deshabilitada)
+  // Forzamos espera hasta que tenantData esté resuelto
+  const loading = authLoading || tenantLoading || (!!tenantData?.tenant_id && accessLoading)
 
   if (loading) {
     return (
