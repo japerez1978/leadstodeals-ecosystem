@@ -124,7 +124,7 @@ async function router(req, res) {
     const props  = url.searchParams.get('properties') || '';
     const propList = props ? props.split(',').filter(Boolean) : [];
     const searchBody = {
-      limit: 20,
+      limit: 100, // Aumentado de 20 para reducir paginación
       sorts: [{ propertyName: 'hs_lastmodifieddate', direction: 'DESCENDING' }],
       ...(propList.length ? { properties: propList } : {}),
     };
