@@ -23,6 +23,7 @@ const https = require('https');
 const HS_TOKEN     = process.env.HS_TOKEN     || '';
 const HS_OBJECT_ID = process.env.HS_OBJECT_ID || '2-198173351';
 const PORT         = process.env.PORT          || 3000;
+// CORS: permitir cualquier origen (seguro para desarrollo/testing, restringir en producción si es necesario)
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
 
 if (!HS_TOKEN) {
@@ -190,6 +191,26 @@ async function router(req, res) {
     try {
       const result = await hsRequest('PATCH',
         `/crm/v3/objects/${HS_OBJECT_ID}/${id}`, { properties: body.properties });
+      res.writeHead(result.status, CORS_HEADERS);
+      res.end(JSON.stringify(result.body));
+    } catch (e) {
+      res.writeHead(500, CORS_HEADERS);
+      res.end(JSON.stringify({ error: e.message }));
+    }
+    return;
+  }
+
+  // ── Proxy genérico: /proxy/* ────────────────────────────
+  // Atiende cualquier ruta /proxy/... y la pasa directamente a HubSpot
+  if (url.pathname.startsWith('/proxy/')) {
+    const hsPath = url.pathname.replace('/proxy', ''); // Quita /proxy, deja /crm/v3/...
+    const method = req.method.toUpperCase();
+    try {
+      let body;
+      if (method !== 'GET' && method !== 'HEAD') {
+        body = await readBody(req);
+      }
+      const result = await hsRequest(method, hsPath, body);
       res.writeHead(result.status, CORS_HEADERS);
       res.end(JSON.stringify(result.body));
     } catch (e) {
