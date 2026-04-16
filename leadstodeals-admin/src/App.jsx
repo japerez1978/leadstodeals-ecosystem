@@ -1,17 +1,19 @@
 import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate, NavLink, useNavigate } from 'react-router-dom'
 import { supabase } from 'core-saas'
-import { Building2, Users, CreditCard, LayoutDashboard, LogOut, Shield, AppWindow } from 'lucide-react'
+import { Building2, Users, CreditCard, LayoutDashboard, LogOut, Shield, AppWindow, LayoutGrid } from 'lucide-react'
 import DashboardPage from './pages/DashboardPage'
 import TenantsPage from './pages/TenantsPage'
 import UsersPage from './pages/UsersPage'
 import BillingPage from './pages/BillingPage'
 import AppsPage from './pages/AppsPage'
 import LoginPage from './pages/LoginPage'
+import ControlPage from './pages/ControlPage'
 
 function Sidebar({ user, onLogout }) {
   const links = [
     { to: '/dashboard', icon: <LayoutDashboard size={18} />, label: 'Dashboard' },
+    { to: '/control', icon: <LayoutGrid size={18} />, label: 'Control Central' },
     { to: '/tenants', icon: <Building2 size={18} />, label: 'Empresas' },
     { to: '/users', icon: <Users size={18} />, label: 'Usuarios' },
     { to: '/apps', icon: <AppWindow size={18} />, label: 'Productos' },
@@ -124,6 +126,7 @@ export default function App() {
       <main className="main-content">
         <Routes>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/control" element={<ControlPage />} />
           <Route path="/tenants" element={<TenantsPage />} />
           <Route path="/users" element={<UsersPage />} />
           <Route path="/apps" element={<AppsPage />} />
