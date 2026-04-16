@@ -1,6 +1,6 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useTenant, useUserAccess } from 'core-saas' // Hooks del Core
+import { useTenant, useUserAccess, supabase } from 'core-saas' // Hooks del Core
 import Spinner from './Spinner'
 
 export const ProtectedRoute = () => {
@@ -51,8 +51,8 @@ export const ProtectedRoute = () => {
             No tienes permisos para acceder a la aplicación de <strong>Ofertas e Intranox</strong>. 
             Contacta con tu administrador para solicitar acceso.
           </p>
-          <button 
-            onClick={() => window.location.href = '/login'}
+          <button
+            onClick={async () => { await supabase.auth.signOut(); window.location.href = '/login' }}
             className="px-6 py-2 bg-red-600/10 border border-red-600/20 text-red-500 rounded-lg hover:bg-red-600/20 transition-all"
           >
             Cerrar Sesión
