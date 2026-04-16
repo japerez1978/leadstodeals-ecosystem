@@ -40,6 +40,13 @@ export const ProtectedRoute = () => {
   }
 
   // 3. Verificación de permiso específico para esta App ('ofertas')
+  console.log('[ProtectedRoute]', {
+    userId: user?.id,
+    tenantId: tenantData?.tenant_id,
+    tenantDataId: tenantData?.id,
+    userRole,
+    userAccess
+  })
   const hasAccess = userRole === 'superadmin'
     || userAccess.includes('ofertas')
     || userAccess.includes('ofertas_hubspot')
