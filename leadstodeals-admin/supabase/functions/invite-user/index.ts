@@ -26,13 +26,41 @@ Deno.serve(async (req) => {
       { auth: { autoRefreshToken: false, persistSession: false } }
     )
 
-    // 1. Enviar invitación — Supabase envía el email con el link
-    const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
-      redirectTo: Deno.env.get('INVITE_REDIRECT_URL') || 'https://app.leadstodeals.com',
-    })
-    if (inviteErr) throw inviteErr
+    // 1. Comprobar si el usuario ya existe en auth
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers()
+    const existingUser = existingUsers?.users?.find((u: any) => u.email === email)
 
-    const auth_user_id = inviteData.user.id
+    let auth_user_id: string
+
+    if (existingUser) {
+      // Ya existe en Auth — reusar el UUID y reenviar invite
+      auth_user_id = existingUser.id
+      // Reenviar el email de invitación igualmente
+      await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: Deno.env.get('INVITE_REDIRECT_URL') || 'https://leadtodealsadmin.netlify.app',
+      })
+    } else {
+      // Usuario nuevo — crear e invitar
+      const { data: inviteData, error: inviteErr } = await supabaseAdmin.auth.admin.inviteUserByEmail(email, {
+        redirectTo: Deno.env.get('INVITE_REDIRECT_URL') || 'https://leadtodealsadmin.netlify.app',
+      })
+      if (inviteErr) throw inviteErr
+      auth_user_id = inviteData.user.id
+    }
+
+    // Comprobar si ya existe en tenant_users para este tenant
+    const { data: existingTU } = await supabaseAdmin
+      .from('tenant_users')
+      .select('id')
+      .eq('auth_user_id', auth_user_id)
+      .eq('tenant_id', Number(tenant_id))
+      .maybeSingle()
+
+    if (existingTU) {
+      return new Response(JSON.stringify({ ok: true, user_id: auth_user_id, note: 'Usuario ya existía, se reenvió la invitación' }), {
+        status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
+    }
 
     // 2. Crear fila en tenant_users (ya con auth_user_id, no hace falta auto-vinculación)
     const { error: tuErr } = await supabaseAdmin.from('tenant_users').insert({
