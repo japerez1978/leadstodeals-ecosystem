@@ -7,7 +7,7 @@ export default function UsersPage() {
   const queryClient = useQueryClient()
   const [modal, setModal] = useState(null)
   const [accessModal, setAccessModal] = useState(null)
-  const [form, setForm] = useState({ email: '', password: '', tenant_id: '', rol: 'user' })
+  const [form, setForm] = useState({ email: '', tenant_id: '', rol: 'user', app_slugs: [] })
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState('')
   const [toggling, setToggling] = useState(null)
@@ -59,31 +59,25 @@ export default function UsersPage() {
     )
 
   // ACCIONES
-  async function handleCreateUser() {
-    if (!form.email || !form.password || !form.tenant_id) return
+  async function handleInviteUser() {
+    if (!form.email || !form.tenant_id) return
     setSaving(true)
 
     try {
-      // 1. Crear en Auth
-      const { data: authData, error: authErr } = await supabase.auth.signUp({
-        email: form.email,
-        password: form.password,
+      const { data, error } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: form.email,
+          tenant_id: parseInt(form.tenant_id),
+          rol: form.rol,
+          app_slugs: form.app_slugs,
+        }
       })
-      if (authErr) throw authErr
+      if (error) throw error
+      if (data?.error) throw new Error(data.error)
 
-      const uid = authData.user?.id
-      
-      // 2. Crear en tenant_users
-      const { error: tuErr } = await supabase.from('tenant_users').insert({
-        auth_user_id: uid,
-        tenant_id: parseInt(form.tenant_id),
-        email: form.email,
-        rol: form.rol,
-      })
-      if (tuErr) throw tuErr
-
-      showToast('✅ Usuario creado y vinculado')
+      showToast('✅ Invitación enviada a ' + form.email)
       queryClient.invalidateQueries({ queryKey: ['saas', 'users'] })
+      queryClient.invalidateQueries({ queryKey: ['saas', 'all_access'] })
       setModal(null)
     } catch (err) {
       showToast('❌ Error: ' + err.message)
@@ -220,26 +214,25 @@ export default function UsersPage() {
         </table>
       </div>
 
-      {/* New User Modal */}
+      {/* Invite User Modal */}
       {modal && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>➕ Nuevo usuario</h3>
+              <h3>✉️ Invitar usuario</h3>
               <button className="btn btn-ghost btn-sm" onClick={() => setModal(null)}><X size={16} /></button>
             </div>
             <div className="modal-body">
+              <p style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+                Se enviará un email con un enlace para que el usuario cree su contraseña.
+              </p>
               <div className="form-group">
                 <label className="form-label">Email</label>
-                <input className="form-input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="usuario@email.com" />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Contraseña</label>
-                <input className="form-input" type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} />
+                <input className="form-input" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="usuario@empresa.com" />
               </div>
               <div className="form-group">
                 <label className="form-label">Empresa</label>
-                <select className="form-select" value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value })}>
+                <select className="form-select" value={form.tenant_id} onChange={e => setForm({ ...form, tenant_id: e.target.value, app_slugs: [] })}>
                   <option value="">— Selecciona empresa —</option>
                   {tenants.map(t => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                 </select>
@@ -249,13 +242,41 @@ export default function UsersPage() {
                 <select className="form-select" value={form.rol} onChange={e => setForm({ ...form, rol: e.target.value })}>
                   <option value="user">User</option>
                   <option value="admin">Admin</option>
-                  <option value="superadmin">Superadmin</option>
                 </select>
               </div>
+              {form.tenant_id && (
+                <div className="form-group">
+                  <label className="form-label">Apps con acceso</label>
+                  {apps.filter(app => tenantHasApp(form.tenant_id, app.slug)).length === 0 ? (
+                    <p style={{ fontSize: 12, color: 'var(--text-muted)' }}>Esta empresa no tiene apps contratadas.</p>
+                  ) : (
+                    apps.filter(app => tenantHasApp(form.tenant_id, app.slug)).map(app => {
+                      const checked = form.app_slugs.includes(app.slug)
+                      return (
+                        <label key={app.slug} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 0', cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => setForm(f => ({
+                              ...f,
+                              app_slugs: checked
+                                ? f.app_slugs.filter(s => s !== app.slug)
+                                : [...f.app_slugs, app.slug]
+                            }))}
+                          />
+                          <span>{app.icon} {app.name}</span>
+                        </label>
+                      )
+                    })
+                  )}
+                </div>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
-              <button className="btn btn-primary" onClick={handleCreateUser} disabled={saving}>{saving ? 'Creando...' : 'Crear usuario'}</button>
+              <button className="btn btn-primary" onClick={handleInviteUser} disabled={saving || !form.email || !form.tenant_id}>
+                {saving ? 'Enviando...' : '✉️ Enviar invitación'}
+              </button>
             </div>
           </div>
         </div>
