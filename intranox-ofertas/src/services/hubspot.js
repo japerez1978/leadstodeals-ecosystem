@@ -159,7 +159,10 @@ async function batchReadProps(objectType, ids, properties) {
       request(`/proxy/crm/v3/objects/${objectType}/batch/read`, {
         method: 'POST',
         body: JSON.stringify({ inputs: chunk.map(id => ({ id })), properties })
-      }).catch(() => ({ results: [] }))
+      }).catch(err => {
+        console.warn(`[batchReadProps] Error reading ${objectType}:`, err.message);
+        return { results: [] };
+      })
     )
   );
   const map = {};
@@ -177,7 +180,10 @@ async function batchReadMap(objectType, ids, propName) {
       request(`/proxy/crm/v3/objects/${objectType}/batch/read`, {
         method: 'POST',
         body: JSON.stringify({ inputs: chunk.map(id => ({ id })), properties: [propName] })
-      }).catch(() => ({ results: [] }))
+      }).catch(err => {
+        console.warn(`[batchReadMap] Error reading ${objectType}.${propName}:`, err.message);
+        return { results: [] };
+      })
     )
   );
   const map = {};
