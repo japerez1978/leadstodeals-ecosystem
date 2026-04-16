@@ -122,6 +122,7 @@ export default function UsersPage() {
     }
 
     const existing = allAccess.find(a => a.auth_user_id === authUserUuid && a.app_slug === appSlug)
+    const tenantUser = users.find(u => u.auth_user_id === authUserUuid && Number(u.tenant_id) === Number(tenantId))
 
     try {
       if (existing) {
@@ -129,6 +130,7 @@ export default function UsersPage() {
       } else {
         await supabase.from('user_app_access').insert([{
           auth_user_id: authUserUuid,
+          tenant_user_id: tenantUser?.id || null,
           app_slug: appSlug,
           tenant_id: tenantId
         }])
