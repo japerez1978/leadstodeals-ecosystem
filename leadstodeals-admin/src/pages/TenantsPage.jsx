@@ -53,24 +53,29 @@ export default function TenantsPage() {
   }
 
   function openNew() {
-    setForm({ nombre: '', subdominio: '' })
+    setForm({ nombre: '', subdominio: '', hubspot_access_token: '' })
     setModal('new')
   }
 
   function openEdit(t) {
-    setForm({ nombre: t.nombre, subdominio: t.subdominio || '' })
+    setForm({ nombre: t.nombre, subdominio: t.subdominio || '', hubspot_access_token: t.hubspot_access_token || '' })
     setModal(t)
   }
 
   async function handleSave() {
     if (!form.nombre.trim()) return
     setSaving(true)
+    const payload = {
+      nombre: form.nombre,
+      subdominio: form.subdominio || form.nombre.toLowerCase().replace(/\s+/g, '-'),
+      ...(form.hubspot_access_token ? { hubspot_access_token: form.hubspot_access_token } : {}),
+    }
     if (modal === 'new') {
-      const { error } = await supabase.from('tenants').insert({ nombre: form.nombre, subdominio: form.subdominio || form.nombre.toLowerCase().replace(/\s+/g, '-') })
+      const { error } = await supabase.from('tenants').insert(payload)
       if (error) showToast('❌ Error: ' + error.message)
       else showToast('✅ Empresa creada')
     } else {
-      const { error } = await supabase.from('tenants').update({ nombre: form.nombre, subdominio: form.subdominio }).eq('id', modal.id)
+      const { error } = await supabase.from('tenants').update(payload).eq('id', modal.id)
       if (error) showToast('❌ Error: ' + error.message)
       else showToast('✅ Empresa actualizada')
     }
@@ -159,6 +164,10 @@ export default function TenantsPage() {
               <div className="form-group">
                 <label className="form-label">Subdominio (slug)</label>
                 <input className="form-input" value={form.subdominio} onChange={e => setForm({ ...form, subdominio: e.target.value })} placeholder="Ej: saltoki" />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Token HubSpot</label>
+                <input className="form-input" value={form.hubspot_access_token} onChange={e => setForm({ ...form, hubspot_access_token: e.target.value })} placeholder="pat-eu1-..." />
               </div>
             </div>
             <div className="modal-footer">
