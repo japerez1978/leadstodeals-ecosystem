@@ -135,6 +135,17 @@ export default function UsersPage() {
           app_slug: appSlug,
           tenant_id: tenantId
         }])
+        // Enviar email de acceso a la nueva app
+        if (tenantUser?.email) {
+          await supabase.functions.invoke('invite-user', {
+            body: {
+              email: tenantUser.email,
+              tenant_id: tenantId,
+              rol: tenantUser.rol || 'user',
+              app_slugs: [appSlug],
+            }
+          })
+        }
       }
       // INVALIDACIÓN MAGICA: Refresca el cache de acceso en todo el sistema
       await queryClient.invalidateQueries({ queryKey: ['saas', 'all_access'] })
