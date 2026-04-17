@@ -10,6 +10,7 @@ import ScoringPage from './pages/ScoringPage'
 import NegociosSinOfertaPage from './pages/NegociosSinOfertaPage'
 import BacklogPage from './pages/BacklogPage'
 import { useAuth } from './context/AuthContext'
+import SetPasswordPage from './pages/SetPasswordPage'
 
 export default function App() {
   const { user } = useAuth()
@@ -17,6 +18,7 @@ export default function App() {
   return (
     <Routes>
       {/* Public routes */}
+      <Route path="/set-password" element={<SetPasswordPage />} />
       <Route path="/register" element={user ? <Navigate to="/ofertas" replace /> : <RegisterPage />} />
       <Route path="/login" element={user ? <Navigate to="/ofertas" replace /> : <LoginPage />} />
 
