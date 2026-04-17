@@ -32,15 +32,21 @@ if (!HS_TOKEN) {
 }
 
 // ── Cabeceras CORS dinámicas ────────────────────────────
+function originAllowed(origin) {
+  if (!origin) return true;
+  return ALLOWED_ORIGINS.some(allowed => {
+    if (allowed === '*') return true;
+    if (allowed.includes('*')) {
+      // Wildcard: https://*.netlify.app → convierte a regex
+      const pattern = allowed.replace(/[.]/g, '\\.').replace(/\*/g, '.*');
+      return new RegExp(`^${pattern}$`).test(origin);
+    }
+    return allowed === origin;
+  });
+}
+
 function getCorsHeaders(reqOrigin) {
-  let origin = '*';
-  if (ALLOWED_ORIGINS[0] === '*') {
-    origin = '*';
-  } else if (reqOrigin && ALLOWED_ORIGINS.includes(reqOrigin)) {
-    origin = reqOrigin;
-  } else if (!reqOrigin) {
-    origin = ALLOWED_ORIGINS[0];
-  }
+  const origin = originAllowed(reqOrigin) ? (reqOrigin || '*') : 'null';
   return {
     'Access-Control-Allow-Origin':  origin,
     'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
