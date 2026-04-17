@@ -9,12 +9,14 @@ import ScoringDetailPage from './pages/ScoringDetailPage';
 import ScoringPage from './pages/ScoringPage';
 import AdminPanelPage from './pages/AdminPanelPage';
 import DemoDetailPage from './pages/DemoDetailPage';
+import SetPasswordPage from './pages/SetPasswordPage';
 
 function App() {
   return (
     <AuthProvider>
       <Router>
         <Routes>
+          <Route path="/set-password" element={<SetPasswordPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
             path="/dashboard"
