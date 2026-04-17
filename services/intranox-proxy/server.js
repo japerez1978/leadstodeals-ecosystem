@@ -221,7 +221,7 @@ async function router(req, res) {
   // ── Proxy genérico: /proxy/* ────────────────────────────
   // Atiende cualquier ruta /proxy/... y la pasa directamente a HubSpot
   if (url.pathname.startsWith('/proxy/')) {
-    const hsPath = url.pathname.replace('/proxy', ''); // Quita /proxy, deja /crm/v3/...
+    const hsPath = url.pathname.replace('/proxy', '') + (url.search || ''); // Incluye query string
     const method = req.method.toUpperCase();
     try {
       let body;
