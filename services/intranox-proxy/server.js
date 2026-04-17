@@ -24,19 +24,30 @@ const HS_TOKEN     = process.env.HS_TOKEN     || '';
 const HS_OBJECT_ID = process.env.HS_OBJECT_ID || '2-198173351';
 const PORT         = process.env.PORT          || 3000;
 // CORS: permitir cualquier origen (seguro para desarrollo/testing, restringir en producción si es necesario)
-const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || '*';
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || process.env.ALLOWED_ORIGIN || '*')
+  .split(',').map(s => s.trim()).filter(Boolean);
 
 if (!HS_TOKEN) {
   console.warn('⚠️  HS_TOKEN no configurado. Añádelo como variable de entorno.');
 }
 
-// ── Cabeceras CORS ──────────────────────────────────────
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin':  ALLOWED_ORIGIN,
-  'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  'Content-Type': 'application/json',
-};
+// ── Cabeceras CORS dinámicas ────────────────────────────
+function getCorsHeaders(reqOrigin) {
+  let origin = '*';
+  if (ALLOWED_ORIGINS[0] === '*') {
+    origin = '*';
+  } else if (reqOrigin && ALLOWED_ORIGINS.includes(reqOrigin)) {
+    origin = reqOrigin;
+  } else if (!reqOrigin) {
+    origin = ALLOWED_ORIGINS[0];
+  }
+  return {
+    'Access-Control-Allow-Origin':  origin,
+    'Access-Control-Allow-Methods': 'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Content-Type': 'application/json',
+  };
+}
 
 // ── Helper: llamada a HubSpot ───────────────────────────
 function hsRequest(method, path, body) {
@@ -85,6 +96,7 @@ function readBody(req) {
 async function router(req, res) {
   const url    = new URL(req.url, `http://localhost:${PORT}`);
   const method = req.method.toUpperCase();
+  const CORS_HEADERS = getCorsHeaders(req.headers.origin);
 
   // Preflight CORS
   if (method === 'OPTIONS') {
