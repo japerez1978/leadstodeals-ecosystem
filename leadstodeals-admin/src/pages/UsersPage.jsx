@@ -89,17 +89,18 @@ export default function UsersPage() {
   async function handleDeleteUser(u) {
     if (!confirm(`¿Eliminar al usuario ${u.email}?`)) return
     try {
+      // 1. Borrar accesos
       if (u.auth_user_id) {
-        await supabase
-          .from('user_app_access')
-          .delete()
-          .eq('auth_user_id', u.auth_user_id)
-          .eq('tenant_id', u.tenant_id)
+        await supabase.from('user_app_access').delete().eq('auth_user_id', u.auth_user_id).eq('tenant_id', u.tenant_id)
       } else {
-        // Fallback para posibles registros legacy.
         await supabase.from('user_app_access').delete().eq('tenant_user_id', u.id)
       }
+      // 2. Borrar de tenant_users
       await supabase.from('tenant_users').delete().eq('id', u.id)
+      // 3. Borrar de auth.users (via Edge Function con service_role)
+      if (u.auth_user_id) {
+        await supabase.functions.invoke('delete-user', { body: { auth_user_id: u.auth_user_id } })
+      }
       showToast('✅ Usuario eliminado')
       queryClient.invalidateQueries({ queryKey: ['saas'] })
     } catch (err) {
