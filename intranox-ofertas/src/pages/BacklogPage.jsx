@@ -17,11 +17,11 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
-const calculateDaysInBacklog = (createdAt, completedAt) => {
-  if (!createdAt || !completedAt) return null
+const calculateDaysInBacklog = (createdAt, endDate = null) => {
+  if (!createdAt) return null
   const created = new Date(createdAt)
-  const completed = new Date(completedAt)
-  const diff = completed - created
+  const end = endDate ? new Date(endDate) : new Date()
+  const diff = end - created
   return Math.floor(diff / (1000 * 60 * 60 * 24))
 }
 
@@ -299,7 +299,7 @@ export default function BacklogPage() {
                   <td className="px-4 py-4 text-accent-300 text-[9px] font-black uppercase">{d.tipo_oferta || '—'}</td>
                   <td className="px-4 py-4"><ActionEditor item={item} currentAction={d.selected_action} onUpdate={handleActionChange} /></td>
                   <td className="px-4 py-4 text-center">
-                    {isPending ? '—' : <span className="text-[10px] font-bold text-steel-400">{calculateDaysInBacklog(item.created_at, item.completed_at) ?? '—'}</span>}
+                    <span className="text-[10px] font-bold text-steel-400">{calculateDaysInBacklog(item.created_at, isPending ? null : item.completed_at) ?? '—'}</span>
                   </td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
