@@ -271,8 +271,8 @@ export default function BacklogPage() {
                   <td className="px-4 py-4">
                     <div className="flex flex-col gap-1.5 max-w-[280px]">
                       <a href={getHsDealUrl(d.dealId)} target="_blank" rel="noopener noreferrer" className="text-white font-bold text-xs hover:text-accent-400">{d.nombre || 'Sin nombre'}</a>
-                      <div className="flex flex-col gap-0.5 text-[9px] text-steel-500 uppercase">
-                        <div>{d.empresa || '—'}</div>
+                      <div className="flex flex-col gap-0.5 text-[9px] uppercase">
+                        <div className="text-emerald-300 font-bold">{d.empresa || '—'}</div>
                         <div className="flex gap-2">
                           <a href={getHsOfferUrl(d.id)} target="_blank" rel="noopener noreferrer" className="text-white hover:text-accent-400 transition-colors cursor-pointer">Nº Oferta: <span className="font-bold">{d.numero_oferta || '—'}</span></a>
                           <a href={getHsOfferUrl(d.id)} target="_blank" rel="noopener noreferrer" className="text-white hover:text-accent-400 transition-colors cursor-pointer">Heredado: <span className="font-bold">{d.numero_heredado || '—'}</span></a>
