@@ -6,9 +6,9 @@ import Spinner from './Spinner'
 
 const navItems = [
   { to: '/', label: 'Ofertas', icon: LayoutDashboard },
-  { to: '/crear', label: 'Nueva Oferta', icon: PlusCircle },
   { to: '/negocios', label: 'Sin Oferta', icon: AlertTriangle },
   { to: '/backlog', label: 'Backlog', icon: ClipboardList },
+  { to: '/crear', label: 'Nueva Oferta', icon: PlusCircle },
   { to: '/scoring', label: 'Scoring', icon: Sliders },
 ]
 
