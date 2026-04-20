@@ -17,6 +17,14 @@ const formatDate = (dateStr) => {
   return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const calculateDaysInBacklog = (createdAt, completedAt) => {
+  if (!createdAt || !completedAt) return null
+  const created = new Date(createdAt)
+  const completed = new Date(completedAt)
+  const diff = completed - created
+  return Math.floor(diff / (1000 * 60 * 60 * 24))
+}
+
 // HubSpot Config
 const HS_PORTAL = '147691795'
 const HS_DOMAIN = 'https://app-eu1.hubspot.com'
@@ -253,6 +261,7 @@ export default function BacklogPage() {
               <th className="px-4 py-4 text-center"><ColumnFilter data={rawData} field="estado_oferta" label="Estado HS" currentFilters={currentFilters} setFilters={setFilters} /></th>
               <th className="px-4 py-4"><ColumnFilter data={rawData} field="tipo_oferta" label="Tipo" currentFilters={currentFilters} setFilters={setFilters} /></th>
               <th className="px-4 py-4 min-w-[180px] text-accent-500">Trabajo</th>
+              <th className="px-4 py-4 text-center text-steel-300 text-[10px] font-bold">Días</th>
               <th className="px-4 py-4 w-[140px] text-right">Acción</th>
             </tr>
           </thead>
@@ -289,6 +298,9 @@ export default function BacklogPage() {
                   <td className="px-4 py-4 text-center text-[10px] text-steel-400 font-bold uppercase">{d.estado_oferta || '—'}</td>
                   <td className="px-4 py-4 text-accent-300 text-[9px] font-black uppercase">{d.tipo_oferta || '—'}</td>
                   <td className="px-4 py-4"><ActionEditor item={item} currentAction={d.selected_action} onUpdate={handleActionChange} /></td>
+                  <td className="px-4 py-4 text-center">
+                    {isPending ? '—' : <span className="text-[10px] font-bold text-steel-400">{calculateDaysInBacklog(item.created_at, item.completed_at) ?? '—'}</span>}
+                  </td>
                   <td className="px-4 py-4 text-right">
                     <div className="flex items-center justify-end gap-1">
                       <button onClick={() => handlePresupuestar(item)} className="p-2 rounded-lg text-accent-500 hover:bg-accent-500/10"><FileText className="w-4 h-4" /></button>
