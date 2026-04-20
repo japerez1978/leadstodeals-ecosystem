@@ -118,7 +118,7 @@ export default function BacklogPage() {
     }
     return (
       <div className="relative" ref={ref}>
-        <button onClick={() => !saving && setOpen(!open)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${saving ? 'opacity-50 cursor-wait' : 'hover:bg-white/5'} ${currentValue ? 'text-steel-300 border-white/5' : 'text-steel-600 border-dashed border-white/10'}`}>
+        <button onClick={() => !saving && setOpen(!open)} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all border ${saving ? 'opacity-50 cursor-wait' : 'hover:bg-white/5'} ${currentValue ? 'text-white border-white/20 bg-white/5' : 'text-steel-600 border-dashed border-white/10'}`}>
           <User className={`w-3 h-3 ${currentValue ? 'text-steel-500' : 'text-steel-700'}`} />
           <span className="truncate max-w-[80px]">{currentValue || 'Sin asignar'}</span>
           {saving && <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" />}
@@ -274,8 +274,8 @@ export default function BacklogPage() {
                       <div className="flex flex-col gap-0.5 text-[9px] text-steel-500 uppercase">
                         <div>{d.empresa || '—'}</div>
                         <div className="flex gap-2">
-                          <span>Nº Oferta: <span className="text-steel-300">{d.numero_oferta || '—'}</span></span>
-                          <span>Heredado: <span className="text-steel-300">{d.numero_heredado || '—'}</span></span>
+                          <a href={getHsOfferUrl(d.id)} target="_blank" rel="noopener noreferrer" className="text-white hover:text-accent-400 transition-colors cursor-pointer">Nº Oferta: <span className="font-bold">{d.numero_oferta || '—'}</span></a>
+                          <a href={getHsOfferUrl(d.id)} target="_blank" rel="noopener noreferrer" className="text-white hover:text-accent-400 transition-colors cursor-pointer">Heredado: <span className="font-bold">{d.numero_heredado || '—'}</span></a>
                         </div>
                       </div>
                     </div>
