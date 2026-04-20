@@ -261,7 +261,7 @@ export default function BacklogPage() {
               <th className="px-4 py-4 text-center"><ColumnFilter data={rawData} field="estado_oferta" label="Estado HS" currentFilters={currentFilters} setFilters={setFilters} /></th>
               <th className="px-4 py-4"><ColumnFilter data={rawData} field="tipo_oferta" label="Tipo" currentFilters={currentFilters} setFilters={setFilters} /></th>
               <th className="px-4 py-4 min-w-[180px] text-accent-500">Trabajo</th>
-              <th className="px-4 py-4 text-center text-steel-300 text-[10px] font-bold">Días</th>
+              <th className="px-4 py-4 text-center text-steel-300 text-[10px] font-bold whitespace-nowrap">Días en Backlog</th>
               <th className="px-4 py-4 w-[140px] text-right">Acción</th>
             </tr>
           </thead>
