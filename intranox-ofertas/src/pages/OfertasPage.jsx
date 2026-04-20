@@ -333,15 +333,21 @@ export default function OfertasPage() {
   const [loadProgress, setLoadProgress] = useState({ loaded: 0, phase: 'loading' })
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedOffers, setSelectedOffers] = useState(new Set())
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(100)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, tipoFilter, unidadFilter, activeStatCard, scoreFilter, outcomeFilter, estadoPartidaFilter, tipoPartidaFilter, stageFilter])
 
   useEffect(() => {
     // Si tenemos tenantId, cargamos las matrices específicas de la empresa.
     // Si no, loadMatrices usará los defaults.
     loadMatrices(tenantId).then(setMatrices).catch(() => {})
-    
+
     getDealStagesMap().then(setStageMap).catch(() => {})
     getPresupuestadores().then(setPresupuestadores).catch(() => {})
-    
+
     // RESTAURAR LÓGICA DE CACHE: Solo cargar de HubSpot si no tenemos datos frescos
     try {
       const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}')
@@ -494,6 +500,14 @@ export default function OfertasPage() {
     }
     return list
   }, [scoredOffers, scoreFilter, outcomeFilter, stageMap, unidadFilter, sortField, sortDir])
+
+  const paginatedData = useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage
+    const end = start + itemsPerPage
+    return scoredFiltered.slice(start, end)
+  }, [scoredFiltered, currentPage, itemsPerPage])
+
+  const totalPages = Math.ceil(scoredFiltered.length / itemsPerPage)
 
   const scoreStats = useMemo(() => {
     const stats = { 
@@ -1123,7 +1137,7 @@ export default function OfertasPage() {
                 <tr><td colSpan={COLUMNS.length} className="px-5 py-20 text-center text-steel-500">
                   {hasFilters ? 'No hay ofertas con esos filtros.' : 'No hay ofertas. ¡Crea la primera!'}
                 </td></tr>
-              ) : scoredFiltered.map((oferta, i) => {
+              ) : paginatedData.map((oferta, i) => {
                 const p = oferta.properties || {}
                 const e = oferta._enriched || {}
                 const dp = e.dealProps || {}
@@ -1223,11 +1237,82 @@ export default function OfertasPage() {
           </table>
         </div>
         {scoredFiltered.length > 0 && (
-          <div className="border-t border-white/6 px-5 py-3 flex items-center justify-between">
-            <span className="text-xs text-steel-500">{scoredFiltered.length} oferta{scoredFiltered.length !== 1 ? 's' : ''}</span>
-            <span className="text-xs text-steel-500">
-              Valor filtrado: <span className="text-emerald-400 font-semibold">{formatCurrency(filteredValue)}</span>
-            </span>
+          <div className="border-t border-white/6 px-5 py-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-steel-500">{scoredFiltered.length} oferta{scoredFiltered.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-steel-500">
+                Valor filtrado: <span className="text-emerald-400 font-semibold">{formatCurrency(filteredValue)}</span>
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-6">
+              <div></div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 rounded-lg bg-surface-800 border border-white/10 text-steel-300 text-xs font-medium hover:border-white/20 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  ← Anterior
+                </button>
+
+                <div className="flex items-center gap-2">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => {
+                    const isVisible =
+                      page === 1 ||
+                      page === totalPages ||
+                      (page >= currentPage - 1 && page <= currentPage + 1)
+
+                    if (!isVisible) {
+                      if (page === currentPage - 2) return <span key="dots1" className="text-steel-600 text-xs">…</span>
+                      if (page === currentPage + 2) return <span key="dots2" className="text-steel-600 text-xs">…</span>
+                      return null
+                    }
+
+                    return (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                          page === currentPage
+                            ? 'bg-accent-500 text-black'
+                            : 'bg-surface-800 border border-white/10 text-steel-300 hover:border-white/20 hover:text-white'
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 rounded-lg bg-surface-800 border border-white/10 text-steel-300 text-xs font-medium hover:border-white/20 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                >
+                  Siguiente →
+                </button>
+
+                <span className="text-xs text-steel-500 ml-4 flex items-center gap-2">
+                  Por página:
+                  <input
+                    type="number"
+                    value={itemsPerPage}
+                    onChange={(e) => {
+                      const val = Math.max(1, parseInt(e.target.value) || 1)
+                      setItemsPerPage(val)
+                      setCurrentPage(1)
+                    }}
+                    min="1"
+                    max="500"
+                    className="w-16 px-3 py-1.5 rounded-lg bg-accent-500/10 border border-accent-500/30 text-accent-400 text-xs font-semibold hover:border-accent-500/50 focus:outline-none focus:border-accent-500 transition-all"
+                  />
+                </span>
+              </div>
+
+              <div></div>
+            </div>
           </div>
         )}
       </div>
