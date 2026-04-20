@@ -1252,7 +1252,7 @@ export default function OfertasPage() {
                 setSendingToBacklog(true)
                 try {
                   const selectedData = scoredFiltered.filter(o => selectedOffers.has(o.id))
-                  await addToBacklog(selectedData, user?.email)
+                  await addToBacklog(selectedData, authUser?.email)
                   setSelectedOffers(new Set())
                   setSelectionMode(false)
                   navigateTo('/backlog')
