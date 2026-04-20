@@ -1,10 +1,12 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import {
   Search, X, Filter, RefreshCw, FileText,
-  ExternalLink, Briefcase, AlertTriangle, ChevronDown
+  ExternalLink, Briefcase, AlertTriangle, ChevronDown, Check, Send
 } from 'lucide-react'
 import { getDealsWithoutOfertas, getDealStagesMap } from '../services/hubspot'
+import { addToBacklog } from '../services/backlog'
+import { useAuth } from '../context/AuthContext'
 import { formatCurrency, formatDate } from '../utils/helpers'
 
 /* ─── Skeleton de fila (UX mientras carga) ─── */
@@ -107,6 +109,12 @@ export default function NegociosSinOfertaPage() {
   const [tipoFilter, setTipoFilter] = useState([])
   const [stageFilter, setStageFilter] = useState([])
   const [stageMap, setStageMap] = useState({})
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedDeals, setSelectedDeals] = useState(new Set())
+  const [sendingToBacklog, setSendingToBacklog] = useState(false)
+
+  const { user } = useAuth()
+  const navigateTo = useNavigate()
 
   useEffect(() => {
     let hasCachedData = false;
@@ -224,12 +232,24 @@ export default function NegociosSinOfertaPage() {
             }
           </p>
         </div>
-        <button
-          onClick={() => fetchDeals()}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface-700/50 border border-white/8 text-steel-300 text-sm font-medium rounded-xl hover:text-white hover:border-white/15 transition-all"
-        >
-          <RefreshCw className="w-4 h-4" />Recargar
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => { setSelectionMode(!selectionMode); setSelectedDeals(new Set()) }}
+            className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all border ${
+              selectionMode
+                ? 'bg-amber-500/20 border-amber-500/60 text-amber-300 shadow-lg shadow-amber-500/25'
+                : 'bg-surface-700/50 border-white/8 text-steel-300 hover:text-white hover:border-white/15'
+            }`}
+          >
+            {selectionMode ? '✕ Salir Comité' : '🎯 Modo Comité'}
+          </button>
+          <button
+            onClick={() => fetchDeals()}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-surface-700/50 border border-white/8 text-steel-300 text-sm font-medium rounded-xl hover:text-white hover:border-white/15 transition-all"
+          >
+            <RefreshCw className="w-4 h-4" />Recargar
+          </button>
+        </div>
       </div>
 
       {/* Banner de progreso — visible durante toda la carga (inicial y paginación) */}
@@ -321,6 +341,22 @@ export default function NegociosSinOfertaPage() {
           <table className="w-full text-sm" id="negocios-sin-oferta-table">
             <thead>
               <tr className="border-b border-white/6">
+                {selectionMode && (
+                  <th className="text-left px-5 py-4 text-steel-400 font-bold tracking-wide uppercase text-[11px] whitespace-nowrap w-12">
+                    <input
+                      type="checkbox"
+                      checked={selectedDeals.size > 0 && selectedDeals.size === filtered.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedDeals(new Set(filtered.map(d => d.id)))
+                        } else {
+                          setSelectedDeals(new Set())
+                        }
+                      }}
+                      className="w-4.5 h-4.5 rounded border-white/20 bg-surface-800 text-amber-500 focus:ring-0 cursor-pointer"
+                    />
+                  </th>
+                )}
                 {['Negocio / Partida', 'Empresa', 'Etapa', 'Unidad', 'Peso RCM (t)', 'Fecha Obj. Oferta', 'Provincia', 'Tipo Partida', 'Estado Partida', ''].map((col, i) => (
                   <th key={i} className="text-left px-5 py-4 text-steel-400 font-bold tracking-wide uppercase text-[11px] whitespace-nowrap">
                     {col}
@@ -363,6 +399,24 @@ export default function NegociosSinOfertaPage() {
 
                 return (
                   <tr key={deal.id} className={`${rowBg} transition-colors group`}>
+                    {selectionMode && (
+                      <td className="px-5 py-4 w-12">
+                        <input
+                          type="checkbox"
+                          checked={selectedDeals.has(deal.id)}
+                          onChange={(e) => {
+                            const newSelected = new Set(selectedDeals)
+                            if (e.target.checked) {
+                              newSelected.add(deal.id)
+                            } else {
+                              newSelected.delete(deal.id)
+                            }
+                            setSelectedDeals(newSelected)
+                          }}
+                          className="w-4.5 h-4.5 rounded border-white/20 bg-surface-800 text-amber-500 focus:ring-0 cursor-pointer"
+                        />
+                      </td>
+                    )}
                     {/* Nombre del negocio */}
                     <td className="px-5 py-4 max-w-[420px]">
                       <a
@@ -457,6 +511,54 @@ export default function NegociosSinOfertaPage() {
           </div>
         )}
       </div>
+
+      {/* Panel flotante de selección */}
+      {selectionMode && selectedDeals.size > 0 && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 animate-fade-in-up">
+          <div className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-surface-800/95 backdrop-blur-xl border border-amber-500/30 shadow-[0_0_40px_rgba(245,158,11,0.2),0_25px_50px_rgba(0,0,0,0.5)]">
+            <span className="text-amber-400 font-black text-sm tabular-nums">
+              {selectedDeals.size} negocio{selectedDeals.size !== 1 ? 's' : ''} seleccionado{selectedDeals.size !== 1 ? 's' : ''}
+            </span>
+            <div className="w-px h-6 bg-white/10"></div>
+            <button
+              onClick={() => setSelectedDeals(new Set())}
+              className="text-xs text-steel-400 hover:text-white transition-colors font-medium"
+            >
+              Deseleccionar
+            </button>
+            <button
+              disabled={sendingToBacklog}
+              onClick={async () => {
+                setSendingToBacklog(true)
+                try {
+                  const selectedData = filtered.filter(d => selectedDeals.has(d.id))
+                  await addToBacklog(selectedData, user?.email)
+                  setSelectedDeals(new Set())
+                  setSelectionMode(false)
+                  navigateTo('/backlog')
+                } catch (err) {
+                  console.error('Error enviando al backlog:', err)
+                  alert('Error enviando al backlog: ' + (err?.message || JSON.stringify(err)))
+                } finally {
+                  setSendingToBacklog(false)
+                }
+              }}
+              className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black uppercase tracking-wider transition-all ${
+                sendingToBacklog
+                  ? 'bg-amber-500/20 text-amber-400/60 cursor-wait'
+                  : 'bg-gradient-to-r from-amber-500 to-amber-600 text-black hover:from-amber-400 hover:to-amber-500 shadow-lg shadow-amber-500/25 hover:shadow-amber-500/40 hover:scale-[1.02]'
+              }`}
+            >
+              {sendingToBacklog ? (
+                <span className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+              ) : (
+                <Send className="w-4 h-4" />
+              )}
+              Llevar a Backlog
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
