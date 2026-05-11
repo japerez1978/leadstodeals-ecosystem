@@ -31,7 +31,7 @@
         <div>
           <h1 class="text-3xl font-bold text-gray-800">Pinchos para la Fiesta</h1>
           <p class="text-sm text-gray-600">Colegio Alcaste-Las Fuentes</p>
-          <p class="text-xs text-gray-500">Alimentar a 1500 personas</p>
+          <p class="text-xs text-gray-500">Servir a 1500 personas</p>
         </div>
       </div>
     </div>
@@ -55,12 +55,12 @@
               <label class="block text-sm font-medium text-gray-700 mb-2">¿Qué aporta?</label>
               <div class="space-y-2">
                 <label class="flex items-center">
-                  <input type="radio" name="tipo" value="pinchos" checked class="mr-2"> 
-                  <span class="text-sm">15 Pinchos</span>
+                  <input type="radio" name="tipo" value="pinchos" checked class="mr-2">
+                  <span class="text-sm">20 Pinchos</span>
                 </label>
                 <label class="flex items-center">
-                  <input type="radio" name="tipo" value="dinero" class="mr-2"> 
-                  <span class="text-sm">30€ en dinero</span>
+                  <input type="radio" name="tipo" value="dinero" class="mr-2">
+                  <span class="text-sm">25€ en dinero</span>
                 </label>
               </div>
             </div>
@@ -148,7 +148,7 @@
     async function registrarAporte() {
       const familia = document.getElementById('familia').value.trim();
       const tipo = document.querySelector('input[name="tipo"]:checked').value;
-      const cantidad = tipo === 'pinchos' ? 15 : 30;
+      const cantidad = tipo === 'pinchos' ? 20 : 25;
 
       if (!familia) {
         alert('Por favor, ingresa el nombre de la familia');
