@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pinchos Fiesta - Colegio Alcaste-Las Fuentes</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .logo-img { width: 80px; height: 80px; }
+    .big-number { font-size: 3rem; font-weight: bold; }
+  </style>
+</head>
+<body class="bg-gray-50">
+  <div class="min-h-screen">
+    <!-- Header -->
+    <div class="bg-white shadow">
+      <div class="max-w-6xl mx-auto px-4 py-6 flex items-center gap-4">
+        <svg class="w-16 h-16" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+          <!-- F borgoña -->
+          <path d="M 30 30 L 30 170 Q 30 170 70 170 L 70 130 L 120 130 L 120 100 L 70 100 L 70 60 L 130 60 L 130 30 Z" fill="#A41D5F"/>
+          <!-- Concha amarilla -->
+          <g transform="translate(140, 120)">
+            <circle cx="0" cy="0" r="35" fill="#FFD700"/>
+            <line x1="0" y1="-35" x2="0" y2="35" stroke="#F4A000" stroke-width="2"/>
+            <line x1="-10" y1="-30" x2="10" y2="30" stroke="#F4A000" stroke-width="2"/>
+            <line x1="-20" y1="-20" x2="20" y2="35" stroke="#F4A000" stroke-width="2"/>
+            <line x1="10" y1="-30" x2="-10" y2="30" stroke="#F4A000" stroke-width="2"/>
+            <line x1="20" y1="-20" x2="-20" y2="35" stroke="#F4A000" stroke-width="2"/>
+          </g>
+        </svg>
+        <div>
+          <h1 class="text-3xl font-bold text-gray-800">Pinchos para la Fiesta</h1>
+          <p class="text-sm text-gray-600">Colegio Alcaste-Las Fuentes</p>
+          <p class="text-xs text-gray-500">Alimentar a 1500 personas</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 py-8">
+      <!-- Grid 2 columnas -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        
+        <!-- Columna izquierda: Formulario y tabla -->
+        <div class="lg:col-span-1">
+          <!-- Formulario -->
+          <div class="bg-white rounded-lg shadow p-6 mb-6">
+            <h2 class="text-xl font-bold text-gray-800 mb-4">Registrar Aporte</h2>
+            
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">Familia</label>
+              <input type="text" id="familia" placeholder="Ej: García López" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-600">
+            </div>
+            
+            <div class="mb-4">
+              <label class="block text-sm font-medium text-gray-700 mb-2">¿Qué aporta?</label>
+              <div class="space-y-2">
+                <label class="flex items-center">
+                  <input type="radio" name="tipo" value="pinchos" checked class="mr-2"> 
+                  <span class="text-sm">15 Pinchos</span>
+                </label>
+                <label class="flex items-center">
+                  <input type="radio" name="tipo" value="dinero" class="mr-2"> 
+                  <span class="text-sm">30€ en dinero</span>
+                </label>
+              </div>
+            </div>
+            
+            <button onclick="registrarAporte()" class="w-full bg-red-600 text-white py-2 rounded-lg font-medium hover:bg-red-700">
+              Registrar
+            </button>
+          </div>
+
+          <!-- Tabla de aportes -->
+          <div class="bg-white rounded-lg shadow p-6">
+            <h2 class="text-lg font-bold text-gray-800 mb-4">Aportes Registrados</h2>
+            <div class="overflow-auto max-h-96">
+              <table class="w-full text-sm">
+                <thead class="bg-gray-100 sticky top-0">
+                  <tr>
+                    <th class="text-left px-2 py-2 font-medium">Familia</th>
+                    <th class="text-left px-2 py-2 font-medium">Aporte</th>
+                    <th class="text-center px-2 py-2 font-medium">Acción</th>
+                  </tr>
+                </thead>
+                <tbody id="aportes-tabla">
+                  <!-- Se llena con JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: Dashboard -->
+        <div class="lg:col-span-2">
+          <!-- Tarjetas de totales -->
+          <div class="grid grid-cols-2 gap-4 mb-6">
+            
+            <!-- Total Pinchos Aportados -->
+            <div class="bg-blue-50 rounded-lg shadow p-6 border-2 border-blue-200">
+              <p class="text-gray-600 text-sm font-medium mb-2">Pinchos Aportados</p>
+              <p class="big-number text-blue-600" id="total-pinchos">0</p>
+              <p class="text-xs text-gray-500 mt-2">de familias</p>
+            </div>
+
+            <!-- Total Dinero -->
+            <div class="bg-green-50 rounded-lg shadow p-6 border-2 border-green-200">
+              <p class="text-gray-600 text-sm font-medium mb-2">Dinero Recaudado</p>
+              <p class="big-number text-green-600" id="total-dinero">0€</p>
+              <p class="text-xs text-gray-500 mt-2">a 0.50€/pincho</p>
+            </div>
+
+            <!-- Pinchos a Comprar -->
+            <div class="bg-yellow-50 rounded-lg shadow p-6 border-2 border-yellow-200">
+              <p class="text-gray-600 text-sm font-medium mb-2">Pinchos a Comprar</p>
+              <p class="big-number text-yellow-600" id="pinchos-comprar">0</p>
+              <p class="text-xs text-gray-500 mt-2">con el dinero</p>
+            </div>
+
+            <!-- Total Final -->
+            <div class="bg-purple-50 rounded-lg shadow p-6 border-2 border-purple-200">
+              <p class="text-gray-600 text-sm font-medium mb-2">Total Final</p>
+              <p class="big-number text-purple-600" id="total-final">0</p>
+              <p class="text-xs text-gray-500 mt-2">pinchos disponibles</p>
+            </div>
+          </div>
+
+          <!-- Estado -->
+          <div id="estado-container" class="bg-white rounded-lg shadow p-8 text-center">
+            <p id="estado-texto" class="text-4xl font-bold mb-4"></p>
+            <p id="estado-detalles" class="text-lg text-gray-600"></p>
+            <p class="text-sm text-gray-500 mt-4">Se necesitan 3000 pinchos (1500 personas × 2 pinchos)</p>
+          </div>
+
+          <!-- Familias registradas -->
+          <div class="mt-6 bg-white rounded-lg shadow p-6">
+            <p class="text-gray-600"><span id="familias-count" class="font-bold text-2xl text-red-600">0</span> familias han aportado</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const API_BASE = window.location.hostname === 'localhost' ? 'http://localhost:3000' : '';
+    const PINCHOS_NECESARIOS = 3000;
+    const PRECIO_PINCHO = 0.50;
+
+    async function registrarAporte() {
+      const familia = document.getElementById('familia').value.trim();
+      const tipo = document.querySelector('input[name="tipo"]:checked').value;
+      const cantidad = tipo === 'pinchos' ? 15 : 30;
+
+      if (!familia) {
+        alert('Por favor, ingresa el nombre de la familia');
+        return;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/aportes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ familia, tipo, cantidad })
+        });
+
+        if (res.ok) {
+          document.getElementById('familia').value = '';
+          await cargarDatos();
+        }
+      } catch (e) {
+        console.error('Error registrando aporte:', e);
+      }
+    }
+
+    async function eliminarAporte(id) {
+      if (!confirm('¿Eliminar este aporte?')) return;
+      try {
+        await fetch(`${API_BASE}/api/aportes/${id}`, { method: 'DELETE' });
+        await cargarDatos();
+      } catch (e) {
+        console.error('Error eliminando aporte:', e);
+      }
+    }
+
+    async function cargarDatos() {
+      try {
+        const [aportesRes, resumenRes] = await Promise.all([
+          fetch(`${API_BASE}/api/aportes`),
+          fetch(`${API_BASE}/api/resumen`)
+        ]);
+
+        const aportesData = await aportesRes.json();
+        const resumenData = await resumenRes.json();
+
+        if (aportesData.success) {
+          actualizarTabla(aportesData.data);
+        }
+
+        if (resumenData.success) {
+          actualizarDashboard(resumenData.data);
+        }
+      } catch (e) {
+        console.error('Error cargando datos:', e);
+      }
+    }
+
+    function actualizarTabla(aportes) {
+      const tbody = document.getElementById('aportes-tabla');
+      tbody.innerHTML = aportes.map(a => `
+        <tr class="border-b hover:bg-gray-50">
+          <td class="px-2 py-3 text-sm">${a.familia}</td>
+          <td class="px-2 py-3 text-sm font-medium">
+            ${a.tipo === 'pinchos' ? `${a.cantidad} pinchos` : `${a.cantidad}€`}
+          </td>
+          <td class="px-2 py-3 text-center">
+            <button onclick="eliminarAporte('${a.id}')" class="text-red-600 hover:text-red-800 text-xs font-medium">
+              Borrar
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    function actualizarDashboard(data) {
+      document.getElementById('total-pinchos').textContent = data.totalPinchos.toLocaleString();
+      document.getElementById('total-dinero').textContent = data.totalDinero.toFixed(2) + '€';
+      document.getElementById('pinchos-comprar').textContent = data.pinchosPorComprar.toLocaleString();
+      document.getElementById('total-final').textContent = data.totalPinchosFinal.toLocaleString();
+      document.getElementById('familias-count').textContent = data.familias;
+
+      const estadoContainer = document.getElementById('estado-container');
+      const estadoTexto = document.getElementById('estado-texto');
+      const estadoDetalles = document.getElementById('estado-detalles');
+
+      if (data.estado === 'ALCANZA') {
+        estadoContainer.className = 'bg-green-50 rounded-lg shadow p-8 text-center border-2 border-green-300';
+        estadoTexto.className = 'text-4xl font-bold mb-4 text-green-600';
+        estadoTexto.textContent = '✓ ¡ALCANZA!';
+        estadoDetalles.textContent = `Tenemos ${data.totalPinchosFinal - data.pinchoNecesarios} pinchos de más`;
+      } else {
+        estadoContainer.className = 'bg-red-50 rounded-lg shadow p-8 text-center border-2 border-red-300';
+        estadoTexto.className = 'text-4xl font-bold mb-4 text-red-600';
+        estadoTexto.textContent = '⚠️ FALTAN';
+        estadoDetalles.textContent = `Necesitamos ${data.faltanPinchos} pinchos más`;
+      }
+    }
+
+    // Cargar datos al abrir
+    cargarDatos();
+
+    // Recargar cada 2 segundos
+    setInterval(cargarDatos, 2000);
+
+    // Enter en el input
+    document.getElementById('familia').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') registrarAporte();
+    });
+  </script>
+</body>
+</html>
